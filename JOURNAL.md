@@ -50,3 +50,61 @@ Written after the work, using local Git history and the development conversation
   Exact model identifiers are unknown from the available evidence.
 - **Time/cost:** Unknown. No reliable elapsed-time or cost measurements were
   recorded; commit timestamps are not a measure of effort.
+
+## 2026-11-11 — PB-03 specification and critical design review
+
+- **Process and roles:** Used the local `feature-workflow` procedure to discuss,
+  draft and iteratively review the check-in contract before implementation. Codex
+  proposed alternatives and authored revisions; the human reviewer challenged
+  edge cases, chose the policies and explicitly approved the specification and
+  its separate commit. No application implementation was performed.
+- **Concurrency and invariants:** The proposed strategy uses PostgreSQL request-key
+  coordination and a short transaction-scoped building allocation lock, with one
+  application transaction owning binding, allocation, session and result changes.
+  Database constraints protect space exclusivity and one active normalized plate
+  per building, including races under different IDs/resident flags. The reviewer
+  directed lowest eligible-space allocation. Temporary contention returns 503,
+  not PARKING_FULL; SKIP LOCKED was rejected as evidence of fullness because it
+  can hide locked capacity. In-memory coordination, Redis and independently
+  committed processing claims were unnecessary for this pilot.
+- **Idempotency evolution:** Codex initially recommended replaying terminal full
+  outcomes. The reviewer chose same-key recovery when capacity becomes available.
+  Review favored retaining canonical payload bindings separately from mutable
+  session state: rolling back the binding on full would lose payload-conflict
+  protection. Successful check-ins replay their original 201 without reallocating;
+  conflicting payloads return 409. Full responses leave the attempt unfinished.
+- **Mistake and correction:** The draft proposed reevaluating
+  VEHICLE_ALREADY_CHECKED_IN later. Critical review exposed how a delayed retry
+  could create an unintended session after the earlier session ended. The reviewer
+  approved persisting and replaying that terminal rejection instead; a legitimate
+  later arrival requires a fresh ID. Successful replay precedes the active-plate check.
+- **Stale retries and trade-offs:** Indefinite full-attempt reevaluation could also
+  admit an abandoned event. Codex proposed a fixed 30-second window; the reviewer
+  selected a configurable default of 60 seconds from first durable binding as an
+  explicit pilot assumption. Retention lasts throughout the pilot, but allocation
+  permission expires: retries do not extend a durable binding's deadline, and
+  expiry produces terminal CHECK_IN_ATTEMPT_EXPIRED. Check time after coordination
+  locks; committed success still replays after expiry. Final review clarified
+  that complete rollback leaves no durable binding/timestamp, so a later retry
+  may establish a new window. The window cannot establish the physical event's age.
+- **Assumptions and open questions:** The reviewer approved provisional resident
+  CAR/MOTOR eligibility in spaces 1–50 and acceptance of gate-asserted residency;
+  gate authentication does not prove entitlement. Per-gate bearer authentication,
+  strict validation/provisional limits, building-wide request scope and a
+  1.5-second performance target were approved project choices, not vendor promises.
+  Explicit full/503 retry behavior, delayed/cross-gate responses and stale-success
+  handling remain unconfirmed. A replayed success must not authorize a different
+  physical arrival. Session inactivity/release, production retention, pricing
+  conflicts and legacy-payment authentication remain unresolved.
+- **Verification evidence:** Reviewed the brief, gate notes and architecture for
+  consistency. Local-link and direct whitespace/final-newline checks passed;
+  `git diff --check` passed, with direct checks needed while the draft was untracked.
+  Full staged contents and the sole staged file were verified before approved
+  commit `8014b73abad7a4b06b12c0753b187d6997e9ff67` (only the PB-03 spec).
+  Post-commit checks confirmed a clean working tree. Real PostgreSQL concurrency,
+  rollback and constraint tests are specified but have not been implemented or run;
+  no runtime guarantees have been experimentally demonstrated yet.
+- **Tools/models:** Codex, the repository-local workflow skill, Git, shell/Python
+  documentation checks and web research of official PostgreSQL documentation.
+  Exact model identifier is unknown from the available evidence.
+- **Time/cost:** Unknown; no reliable duration or cost measurements are available.
