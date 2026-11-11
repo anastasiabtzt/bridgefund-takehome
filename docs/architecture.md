@@ -1,0 +1,141 @@
+# ParkingBusiness architecture
+
+Status: approved high-level design; business questions below remain open.
+
+## Confirmed requirements and system context
+
+The pilot serves building `PB-AMS-9X4T`, with 150 spaces, resident/car/motorcycle
+eligibility rules, two entrance gates and two exit gates. Allocation must prevent
+two vehicles receiving the same space. Calendar days use Amsterdam local time.
+See [the brief](../BRIEF.md) for the requirements and its pricing contradiction.
+
+- **Gates:** authenticated REST check-in/check-out over HTTPS. Requests can overlap
+  and retry with the same `X-Request-Id`; the gate waits two seconds for a response.
+  Plate representations can differ in case, spaces and dashes. See [gate notes](gates.md).
+- **Payment provider:** payment-attempt confirmations can be duplicated and arrive
+  out of order. Signed requests use HMAC-SHA256 over the raw body. The provider
+  expects a response within five seconds. Its unsigned legacy exception conflicts
+  with the authentication requirement. See [provider notes](payment-provider.md).
+- **Public display:** reads occupancy without authentication; responses must not
+  expose plates or session/payment details.
+- **Simulator:** an external test client for signed confirmations, retries, failed
+  attempts, out-of-order delivery and legacy calls. See [simulator documentation](../simulator/README.md).
+
+The API records parking and payment effects in PostgreSQL. No outbound payment
+initiation or barrier-control integration is assumed; the gate's payment-status
+integration is not yet specified.
+
+## Architectural decisions
+
+Use NestJS and TypeScript for a REST API, PostgreSQL with Drizzle for persistence,
+and a modular monolith: one application deployment and one database. These are
+chosen implementation decisions, not technologies mandated by the brief.
+
+### Three domain modules
+
+| Module | Responsibilities |
+| --- | --- |
+| Parking | Allocation, session lifecycle, eligibility policies, plate normalization, gate-request idempotency and public occupancy reads. Owns space exclusivity. |
+| Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. Tariff interpretation remains open. |
+| Payments | Payment-attempt identity, duplicate/conflicting confirmations and payment-state rules. A late failed attempt must not undo a different successful payment. |
+
+Keep allocation and sessions together because their invariants are tightly coupled.
+Occupancy is a read-only Parking operation over committed state, with no separate
+NestJS module or projection store. Modules expose narrow application operations
+and do not access each other's persistence internals.
+
+Keep building context explicit so the pilot does not depend on an implicit global
+building. Do not implement multi-building management or tariff administration now.
+
+### Domain, application and infrastructure
+
+- **Domain:** explicit business invariants, policies and valid transitions in plain
+  TypeScript, independent of NestJS, HTTP and Drizzle.
+- **Application:** coordinate use cases and module interactions, obtain time,
+  invoke domain behavior and own transaction boundaries.
+- **Infrastructure:** REST controllers, caller authentication, raw-body signature
+  verification, input validation, Drizzle persistence and configuration.
+
+Use a minimal Clock abstraction for the current instant. Application use cases
+obtain time through it and pass explicit timestamps into domain calculations.
+Tests control time without sleeps; Amsterdam date interpretation belongs to
+billing policy, not the Clock. Avoid generic repositories and speculative layers.
+
+### Transactions, idempotency and concurrency
+
+One application use case owns one database transaction, including coordinated
+operations across modules. Participants use the same transaction context; they
+must not independently start or commit transactions that permit partial updates.
+
+| Use case | Atomic work |
+| --- | --- |
+| Check-in | Request deduplication, allocation, session creation and preservation of the replayable result. |
+| Check-out | Session changes, the established Billing result and preservation of the replayable result. Completion and release effects remain undecided. |
+| Payment confirmation | Attempt deduplication, validated payment effects and any agreed Parking effects. Release behavior remains undecided. |
+| Occupancy | Read-only query of committed allocation state; no mutation workflow. |
+
+`X-Request-Id` identifies a gate event; it does not itself guarantee idempotency.
+Persist request identity, relevant payload and replayable outcome atomically with
+the business effect. Coordinate simultaneous duplicates and detect reuse with a
+conflicting payload instead of silently replaying or applying another operation.
+Apply equivalent identity/conflict handling to payment confirmations. Exact key
+scope, conflict responses and retention belong in feature specifications.
+
+Use PostgreSQL constraints as a final protection for exclusivity and identity,
+with deliberate locking or conditional writes. Start with short READ COMMITTED
+transactions and validate the locking strategy through concurrent tests; an
+availability read followed by an unprotected write is insufficient. Acquire locks
+consistently and bound retries for transient conflicts. In-process mutexes cannot
+provide guarantees across restarts or multiple application instances.
+
+Authenticate and validate requests before business effects. A webhook success
+acknowledgment follows durable acceptance/commit; duplicates have no extra effect.
+Keep external network calls outside database transactions. Aim to meet caller
+timeouts and specify retryable contention responses. This provides atomic local
+effects under repeated delivery, not exactly-once network delivery.
+
+## Testing strategy
+
+- **Unit tests:** domain transitions, normalization and agreed tariff examples,
+  including midnight and daylight-saving boundaries, using controlled time.
+- **Real PostgreSQL integration tests:** competing allocations, simultaneous
+  duplicates, payload conflicts, checkout/payment races, rollback across module
+  operations and payment replay/order handling. Use separate connections and
+  coordinated overlap; mocks or one shared test transaction do not prove these guarantees.
+- **HTTP tests:** caller permissions, validation/errors, raw-body HMAC verification,
+  occupancy privacy and simulator compatibility.
+
+Use test-first development selectively for critical invariants and regressions.
+Prefer disposable local PostgreSQL and a PostgreSQL CI service; add Testcontainers
+only if its reproducibility benefit justifies another dependency. CI must run
+lint, tests and a dependency audit as required by the assignment.
+
+## Trade-offs and rejected alternatives
+
+| Decision | Benefit and cost / alternative |
+| --- | --- |
+| Modular monolith | Simple deployment and atomic cross-module work; module boundaries need discipline. Microservices would add distributed consistency problems. |
+| Drizzle and explicit persistence behavior | Visible SQL and transaction semantics; requires deliberate concurrency design. Avoid a generic repository abstraction that hides these details. |
+| PostgreSQL concurrency control | Works across processes and restarts; contention and retries need testing. In-memory locking is insufficient. |
+| Synchronous processing | Straightforward failure/retry reasoning; constrained by request budgets. Defer queues and an outbox until asynchronous external effects require them. |
+| Direct occupancy reads | One source of truth with some read load. Defer caches and duplicated projections. |
+| Pragmatic DDD | Clear language, boundaries and invariants. CQRS frameworks, event sourcing and ceremonial patterns need a concrete justification. |
+
+## Unresolved business questions
+
+Seek business clarification where appropriate for these questions:
+
+- When is a session completed, and when is its space released: checkout, payment,
+  or physical departure? No physical-exit callback is defined.
+- Does pricing use started hours or proportional time? The 70-minute example
+  conflicts with the tariff wording. Rounding and cross-midnight treatment need examples.
+- How can unsigned legacy webhook requests be authenticated? A caller-controlled
+  legacy header alone is insufficient proof of identity.
+- Who establishes resident entitlement, and how are conflicting resident flags handled?
+- How does the exit gate learn that payment succeeded?
+- What happens for wrong amounts, currency mismatches or confirmations before checkout?
+
+If clarification is unavailable, record explicit, justified and revisable
+assumptions in the relevant reviewed feature specifications before implementation.
+Never present assumptions as confirmed requirements or infer answers from the
+selected stack or module boundaries.
