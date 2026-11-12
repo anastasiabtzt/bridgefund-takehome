@@ -183,3 +183,47 @@ Written after the work, using local Git history and the development conversation
   passed. New acceptance scenarios are planned, not executed; no application work.
 - **Tools/time/cost:** Codex, Git and shell/Python checks. Exact model, elapsed
   time and cost unknown. No new infrastructure or endpoints introduced.
+
+## 2026-11-12 — Checkpoint 1: runnable backend foundation
+
+- **Authorization and completed scope:** The user approved Checkpoint 1 after the
+  implementation plan. Verified approved specifications in commit `6aadeb2` and
+  a clean checkout before coding. Added minimal NestJS/TypeScript startup, validated
+  configuration, pg/Drizzle connection, Clock, Compose PostgreSQL 17, setup commands
+  and configuration/connectivity tests. No business routes, tables or migrations;
+  Billing/Payments modules and CI remain planned for later checkpoints.
+- **Implementation choices:** Stable NestJS 12.4.2, Drizzle 0.45.4 and pg 8.23.1;
+  TypeScript 6.0.3 fits typescript-eslint's supported range. Pinned dependencies and
+  lockfile; Node 24/npm 11, ESM, direct tsc builds, tsx development and Node tests.
+  Small pool (5), 250 ms connection/lock waits, 1000 ms statement/idle-transaction
+  limits and 10000 ms pool idle timeout are configurable. They do not enforce the
+  future 1.5-second end-to-end use-case budget by themselves.
+- **Mistakes and corrections:** Initial CommonJS compilation exposed NestJS 12's
+  ESM requirement; corrected module mode/imports. A smoke-test assertion assumed
+  PostgreSQL reports 1000 ms as that literal string; it reports 1s, so the test now
+  checks numeric pg_settings. A custom development build/watch approach looped on
+  generated output; replaced it with tsx and verified an actual source restart.
+- **Executed verification:** `npm ci --ignore-scripts --no-audit --cache
+  /tmp/bridgefund-npm-cache`, `npm run build`, `npm run lint` and `npm test` passed
+  (3 configuration tests). `TEST_DATABASE_URL=postgresql://parkingbusiness:local-development-only@127.0.0.1:5432/parkingbusiness
+  npm run test:integration` passed (1 real PostgreSQL test through pg/Drizzle,
+  including statement-timeout settings). Docker Compose config is valid and the
+  service healthy; a read-only pg_tables query confirmed zero public tables.
+  Compiled startup checks exercised absent DATABASE_URL, invalid PORT, unreachable
+  PostgreSQL and redacted errors. Both compiled and development startup served
+  expected HTTP 404; source-watch restart recovered and test app processes stopped.
+- **Environment and dependency findings:** Docker Desktop was initially stopped;
+  started the existing installation and used the authorized local Compose service.
+  Dependencies installed with lifecycle scripts disabled. `npm audit --omit=dev`
+  reported zero vulnerabilities. Full audit reported 10 moderate findings in the
+  lint-only minimatch chain (GHSA-g3hv-75wg-m249), no high/critical findings. Deferred
+  incompatible forced remediation: fixed local lint paths are used, not HTTP input.
+  Reassess at Checkpoint 2 before configuring audit CI; do not suppress globally.
+  PostgreSQL remains running locally; application test processes are stopped.
+- **Planned, not executed:** Feature integration/concurrency tests, migrations,
+  seed data, CI and all PB-03–PB-06 endpoints. No runtime business guarantees claimed.
+- **Tools/time/cost:** Codex, Git, Node 24.22.0/npm 11.19.1, TypeScript/ESLint,
+  Docker/PostgreSQL, shell/Python and official/package-registry documentation.
+  Measured elapsed wall-clock interval through verification: 666 seconds,
+  including installs, waits and corrections; excludes this journal/final response.
+  Exact model identifier and tool/token cost are unavailable.
