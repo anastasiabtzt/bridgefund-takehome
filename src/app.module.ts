@@ -1,18 +1,15 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { APP_CONFIG, AppConfig } from './config.js';
-import { Clock, SystemClock } from './clock.js';
-import { DatabaseService } from './database/database.service.js';
+import { AppConfig } from './config.js';
+import { RuntimeModule } from './runtime.module.js';
+import { ParkingModule } from './parking/parking.module.js';
 
 @Module({})
 export class AppModule {
   static register(config: AppConfig): DynamicModule {
+    const runtime = RuntimeModule.register(config);
     return {
       module: AppModule,
-      providers: [
-        { provide: APP_CONFIG, useValue: config },
-        { provide: Clock, useClass: SystemClock },
-        DatabaseService,
-      ],
+      imports: [ParkingModule.register(runtime)],
     };
   }
 }

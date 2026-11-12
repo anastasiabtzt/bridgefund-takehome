@@ -337,3 +337,74 @@ Retrospective entry based on local Git history and development notes.
   checks passed; only the five approved documentation files changed. No runtime
   tests were run for this documentation-only change. Tools: Codex, Git, shell and
   Python. Elapsed time, exact model and tool/token cost unknown. No commit or push.
+
+## 2026-11-12 — Checkpoint 3: PB-06 public occupancy
+
+- **Authorization and scope:** The user approved the PB-06 plan and requested
+  conservative transient-error classification and minimal dependency wiring.
+  Codex verified the unchanged PB-06 specification was approved in conversation
+  and committed in 6aadeb2 before implementation. Preserved the five preceding
+  documentation changes; no other business endpoints, dependencies or migrations.
+- **Implemented:** Public GET /occupancy inside Parking returns the four approved
+  fields for all seeded pilot spaces in ID order, with no-store and unknown-query
+  rejection. Reused DatabaseService and moved its existing provider registration
+  into ParkingModule; no global module or repository abstraction. A single Drizzle
+  SELECT with correlated EXISTS reads active PARKED/AWAITING_PAYMENT allocations
+  using one committed MVCC snapshot, without building/session allocation locks or
+  selecting plates/session IDs. Recognized PostgreSQL/network codes yield sanitized
+  503; unexpected SQL, mapping and application errors yield sanitized 500. Errors
+  without a recognized code remain 500 rather than guessing from message text.
+- **Mistakes/corrections:** Initial test compilation exposed an overloaded pg
+  connect return-type inference error; used explicit PoolClient. The first real
+  query failed because Drizzle stripped column qualifiers inside a raw EXISTS
+  projection, yielding SQL 42883; the HTTP response correctly hid it as 500.
+  Replaced that expression with Drizzle's nested query builder and added a
+  cross-building same-space-ID fixture. TypeScript then required an explicit
+  boolean SQL projection type. No such failure remains in the passing suite.
+- **Executed verification:** npm run build and npm run lint passed. npm test:
+  8 passed, including HTTP contract/query/cache and sanitized failure cases.
+  TEST_DATABASE_URL=postgresql://parkingbusiness_test:local-test-only@127.0.0.1:5433/parkingbusiness_test
+  npm run test:integration: all 39 checks passed against real PostgreSQL, including
+  existing persistence/concurrency checks. New HTTP reads use a different pool
+  from the writer: uncommitted changes stay invisible, rollbacks preserve state,
+  commit exposes completion and allocation together, and a held building row lock
+  does not block reads. Fixtures exercise persisted lifecycle states, not deferred
+  check-in/checkout/payment endpoints. npm test --prefix simulator: 10 passed.
+  npm run audit:dependencies: 0 blocking findings; existing 14 reported dev-tool
+  packages remain covered by exceptions due for review before 2026-11-19.
+- **Environment and limits:** Initial HTTP/simulator runs failed to bind localhost
+  under the sandbox; reruns with elevated local access passed. Docker access also
+  needed escalation. No remote CI run or end-to-end gate integration is claimed.
+  Database reset uses the existing guarded disposable test identity only; migration
+  history and constraints are unchanged. Whitespace/final-newline checks passed.
+- **Tools/time:** Codex, Git, TypeScript/ESLint, NestJS, Drizzle/pg, Node test/fetch,
+  Python and PostgreSQL 17 via existing Docker containers. Measured elapsed time
+  through verification: 252 seconds, excluding this journal/final review.
+  Exact model and tool/token cost unknown. No commit or push.
+
+## 2026-11-12 — PB-06 shared runtime wiring correction
+
+- **Review and decision:** The user identified that Parking's private database
+  registration would not be shared with future Payments providers and that a
+  parent AppModule Clock is not visible inside imported feature modules. Codex
+  proposed a small non-global RuntimeModule; the user approved the correction.
+- **Applied:** AppModule configures RuntimeModule once and passes that same dynamic
+  module definition into Parking's imports. Runtime exports APP_CONFIG,
+  DatabaseService, SystemClock and Clock; Clock aliases SystemClock via useExisting.
+  Parking no longer registers its own database/config providers. No transaction
+  abstraction: coordinating application use cases still own and pass a transaction.
+- **Evidence:** A test-only probe inside the actual Parking module and a sibling
+  test module import the same configured runtime. Identity assertions prove shared
+  config, Clock/SystemClock, DatabaseService and pool; Nest reports exactly one
+  DatabaseService provider. A real PostgreSQL query succeeds and application
+  shutdown closes that pool. No unused production test providers were added.
+- **Verification/corrections:** npm run build and npm run lint passed; npm test
+  passed all 8 unit/HTTP tests after rerunning with localhost sandbox access.
+  TEST_DATABASE_URL=postgresql://parkingbusiness_test:local-test-only@127.0.0.1:5433/parkingbusiness_test
+  npm run test:integration passed all 40 checks, including occupancy and the new
+  wiring check. The first DI test incorrectly selected its dynamic sibling module
+  by class; Codex corrected it to select the configured definition and ensured
+  cleanup covers assertion failures. Whitespace and final-newline checks passed.
+  Existing occupancy behavior, schema, migrations and prior documentation changes
+  are preserved. Tools: Codex, Git, NestJS, Node/npm, TypeScript/ESLint, Python and
+  PostgreSQL. Elapsed time and exact model/tool cost unknown. No commit or push.
