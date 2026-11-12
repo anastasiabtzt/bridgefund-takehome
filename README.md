@@ -126,3 +126,26 @@ simulator), unit/integration tests, simulator tests and the scoped dependency au
 
 See [architecture](docs/architecture.md), [specifications](specs/PB-03-check-in.md),
 [agent instructions](AGENTS.md) and [journal](JOURNAL.md).
+
+### Check-in gate access
+
+`POST /check-in` requires a per-gate bearer credential and one UUID
+`X-Request-Id`. Configure `GATE_CREDENTIALS` as a JSON array in your local `.env`:
+
+```text
+GATE_CREDENTIALS=[{"id":"entrance-1","buildingId":"PB-AMS-9X4T","role":"ENTRANCE","secret":"REPLACE_WITH_A_UNIQUE_RANDOM_SECRET"}]
+```
+
+Generate each secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+Do not use the placeholder. Configure a different secret for each entrance/exit
+identity; roles are `ENTRANCE` or `EXIT`. Only entrance credentials can check in.
+An absent/empty array disables gate access while public occupancy remains available.
+Secrets must be 32–256 printable ASCII characters; never commit real credentials.
+
+The body is exactly `vehicleType` (`CAR`/`MOTOR`), `isResident` (boolean) and
+`licensePlate` (see [PB-03](specs/PB-03-check-in.md)). The body limit is 4 KiB.
+The pilot derives the building from gate configuration. Reuse the same request UUID
+for retries of one event, including after an uncertain response. Committed success,
+full-capacity and duplicate-plate outcomes replay unchanged. A new physical event
+requires a new UUID. PostgreSQL pool/query/lock timeouts remain configurable above;
+the 1.5-second response target is not an SLA or a strict aggregate deadline.

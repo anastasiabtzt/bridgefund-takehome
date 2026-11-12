@@ -408,3 +408,87 @@ Retrospective entry based on local Git history and development notes.
   Existing occupancy behavior, schema, migrations and prior documentation changes
   are preserved. Tools: Codex, Git, NestJS, Node/npm, TypeScript/ESLint, Python and
   PostgreSQL. Elapsed time and exact model/tool cost unknown. No commit or push.
+
+## 2026-11-12 — PB-03 check-in implementation
+
+- **Authorization:** The user explicitly deferred and manages the Git checkpoint
+  sequence, authorizing implementation against the approved working-tree revision.
+  Codex preserved the existing specification, architecture, PB-06 and runtime work;
+  no staging, commits, pushes or stash operations. The earlier spec-commit gate was
+  intentionally overridden by that instruction, not inferred from a status label.
+- **Implemented decisions:** Minimal configuration-based per-gate bearer access,
+  entrance authorization, strict JSON/header/plate validation and canonical payloads.
+  Missing credentials disable gate access. Parking owns one READ COMMITTED
+  transaction: deterministic gate-namespace advisory identity lock, existing outcome
+  replay/conflict check, building row lock, fresh active-plate/capacity checks, then
+  complete immutable outcome insertion with any new session. No placeholder rows,
+  new dependencies, migrations or generic locking/transaction framework.
+- **Concurrency and error policy:** Lowest eligible allocation is serialized across
+  application instances. Only the active-plate partial index uses targeted ON CONFLICT
+  handling; other integrity failures are not swallowed. A known space-index conflict
+  rolls back and returns 503 rather than false fullness; unknown SQL failures return
+  sanitized 500. Successful and both terminal business responses replay after commit.
+  Existing pool/lock/query timeouts bound waits. Per the user's refinement, 1.5 seconds
+  remains a response target, not a strict aggregate deadline or SLA.
+- **Executed evidence:** npm run build and npm run lint passed; npm test passed all
+  11 unit/HTTP tests. With the guarded local TEST_DATABASE_URL, npm run test:integration
+  passed all 52 checks against real PostgreSQL, including existing persistence,
+  occupancy and runtime DI checks. Two application instances and separate observer/
+  holder connections establish actual lock waits before release (no sleeps). Covered
+  duplicates/conflicts, equivalent plates/resident flags, last-space allocation,
+  terminal full/plate replay, lost-response replay, narrow plate-conflict fallback,
+  outcome-insertion rollback for success/full/duplicate rejection and 503 lock timeout
+  followed by same-key recovery. Existing database constraint tests remain passing.
+  npm test --prefix simulator passed all 10 tests. npm run audit:dependencies reported
+  no blocking findings: 14 existing dev-tool packages remain covered by the existing
+  advisory exceptions requiring review before 2026-11-19; simulator remains clean.
+- **Corrections and limits:** Test compilation caught overly narrow inferred UUID
+  typing; Codex annotated the helper. HTTP tests caught Nest-wrapped JSON parser
+  errors bypassing the required envelope; corrected safe 400/413/415 translation.
+  Local HTTP binding initially failed under the sandbox; elevated reruns passed.
+  Tests were added alongside implementation rather than consistently failing-first,
+  a process deviation from the preferred critical-invariant workflow. No remote CI,
+  physical barrier integration or broad performance benchmark is claimed. Checkout,
+  billing and payment endpoints remain unimplemented. Test-only triggers used for
+  fault/overlap control were removed; production migrations/constraints are unchanged.
+- **Checkpoint/tools:** Whitespace, final-newline and preservation checks passed.
+  The implementation is ready for review; journal decisions are implementation
+  choices pending that review, not claims of final user acceptance. Codex, Git,
+  Node/npm, NestJS, Drizzle/pg, PostgreSQL, TypeScript/ESLint and Python were used.
+  Measured elapsed time through verification: 505 seconds, excluding this entry
+  and final review. Exact model and tool/token cost unknown.
+
+## 2026-11-12 — PB-03 independent-review correction pass
+
+- **Review and approved trade-off:** The user relayed independent-review findings
+  and approved keeping bounded PostgreSQL pool/lock/query timeouts without an
+  aggregate deadline or Promise.race cancellation. Codex inspected PB-03: it
+  explicitly calls 1.5 seconds a target to test, not a network SLA. The nearby
+  “server budget” wording is potentially stronger, but no guaranteed deadline is
+  established; the approved specification was left unchanged.
+- **New PostgreSQL evidence:** Exhausted the tested app's single-connection pool by
+  checking out its sole connection. The HTTP request returns sanitized 503 with no
+  session/outcome and no leftover queued waiter. Releasing the connection permits
+  same-key check-in/replay; a direct query proves the same pool remains usable.
+  A temporary BEFORE-outcome trigger verifies the new session already exists inside
+  the transaction, then executes SQL until the test-local 150 ms statement timeout
+  cancels it. HTTP returns sanitized 503; a separate observer sees neither session
+  nor outcome. Removing the trigger permits same-key success/replay with exactly
+  one session and outcome. No sleeps, new dependencies or production hooks.
+- **Evidence correction:** Renamed the prior “lost response” test to committed
+  canonical/historical replay. It receives and compares ordinary HTTP responses;
+  earlier journal wording about lost-response coverage must not be read as network
+  fault-injection evidence. No dropped-response or network-fault test was added.
+- **Executed verification:** npm run build and npm run lint passed; npm test passed
+  all 11 unit/HTTP tests. With the existing isolated local TEST_DATABASE_URL,
+  npm run test:integration passed all 54 PostgreSQL checks. npm test --prefix
+  simulator passed all 10 tests. npm run audit:dependencies reported 0 blocking
+  findings: the same 14 dev-tool packages remain under existing advisory exceptions
+  requiring review before 2026-11-19; simulator audit is clean. No failures occurred
+  in this pass. Whitespace/final-newline and preservation checks passed; only this
+  journal append and the check-in integration test changed. The temporary trigger
+  and function were removed. No runtime timeout or business behavior changed.
+- **Tools/time:** Codex, Git, Node/npm, TypeScript/ESLint, PostgreSQL, NestJS and
+  Python. Measured elapsed time through verification: 103 seconds; excludes
+  this journal/final review. Exact model/tool cost unknown. All prior work preserved;
+  no staging, commits, pushes or stash modifications.
