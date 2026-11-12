@@ -1,6 +1,7 @@
 # ParkingBusiness architecture
 
-Status: approved high-level design; business questions below remain open.
+Status: approved high-level design. PB-04–PB-06 now define the approved
+pilot lifecycle and billing policies; genuine external questions remain below.
 
 ## Confirmed requirements and system context
 
@@ -36,7 +37,7 @@ chosen implementation decisions, not technologies mandated by the brief.
 | Module | Responsibilities |
 | --- | --- |
 | Parking | Allocation, session lifecycle, eligibility policies, plate normalization, gate-request idempotency and public occupancy reads. Owns space exclusivity. |
-| Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. Tariff interpretation remains open. |
+| Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. Pilot tariff interpretation is approved and documented in PB-04; employer confirmation of the contradictory €5.83 example remains pending. |
 | Payments | Payment-attempt identity, duplicate/conflicting confirmations and payment-state rules. A late failed attempt must not undo a different successful payment. |
 
 Keep allocation and sessions together because their invariants are tightly coupled.
@@ -70,8 +71,8 @@ must not independently start or commit transactions that permit partial updates.
 | Use case | Atomic work |
 | --- | --- |
 | Check-in | Request deduplication, allocation, session creation and preservation of the replayable result. |
-| Check-out | Session changes, the established Billing result and preservation of the replayable result. Completion and release effects remain undecided. |
-| Payment confirmation | Attempt deduplication, validated payment effects and any agreed Parking effects. Release behavior remains undecided. |
+| Check-out | Session changes, the established Billing result and preservation of the replayable result. Freeze billing at checkout; zero-charge completion releases allocation. |
+| Payment confirmation | Attempt deduplication, validated payment effects and any agreed Parking effects. Exact payment completes/releases atomically; extra PAID events after completion are recorded for reconciliation. |
 | Occupancy | Read-only query of committed allocation state; no mutation workflow. |
 
 `X-Request-Id` identifies a gate event; it does not itself guarantee idempotency.
@@ -121,19 +122,29 @@ lint, tests and a dependency audit as required by the assignment.
 | Direct occupancy reads | One source of truth with some read load. Defer caches and duplicated projections. |
 | Pragmatic DDD | Clear language, boundaries and invariants. CQRS frameworks, event sourcing and ceremonial patterns need a concrete justification. |
 
-## Unresolved business questions
+## Approved pilot decisions and external clarification
 
-Seek business clarification where appropriate for these questions:
+Pilot decisions below are approved; external clarification remains where noted:
 
-- When is a session completed, and when is its space released: checkout, payment,
-  or physical departure? No physical-exit callback is defined.
-- Does pricing use started hours or proportional time? The 70-minute example
-  conflicts with the tariff wording. Rounding and cross-midnight treatment need examples.
-- How can unsigned legacy webhook requests be authenticated? A caller-controlled
-  legacy header alone is insufficient proof of identity.
-- Who establishes resident entitlement, and how are conflicting resident flags handled?
-- How does the exit gate learn that payment succeeded?
-- What happens for wrong amounts, currency mismatches or confirmations before checkout?
+- Approved pilot lifecycle: billing freezes at checkout; paid or free completion
+  deactivates the session and releases logical allocation. Physical departure is
+  not observed; no physical-exit callback is defined.
+- Approved pilot tariff: started hours and caps per Amsterdam calendar day, in
+  integer cents. The conflicting 583-cent example awaits employer confirmation;
+  detailed boundaries are specified in PB-04.
+- Approved pilot policy rejects unsigned legacy webhooks. Employer/provider
+  clarification of legacy support remains open; the legacy header proves no identity.
+- Resident entitlement remains externally unverified; the pilot accepts gate-asserted
+  residency and rejects a mismatching checkout flag as specified in PB-04.
+- PB-05 specifies PAID settlement matching, mismatch-tolerant FAILED recording,
+  uncached pre-checkout CHECKOUT_REQUIRED and post-completion reconciliation.
+  Pre-checkout recovery depends on the provider's limited redelivery window.
+
+### Open integration question: exit-gate payment notification
+
+How does the exit gate learn that payment succeeded? The supplied contract does
+not define this interaction. No endpoint or notification mechanism is assumed;
+backend approval does not establish end-to-end barrier integration.
 
 If clarification is unavailable, record explicit, justified and revisable
 assumptions in the relevant reviewed feature specifications before implementation.

@@ -1,8 +1,7 @@
 # PB-03: Check-in
 
-Status: revised specification awaiting human review. The prior revision was approved
-and committed as `8014b73`; this revised text requires explicit approval and a new
-specification commit before implementation.
+Status: approved; terminal-full revision committed as `7198639` on 2026-11-12.
+Ready for implementation when separately authorized.
 
 ## Scope and sources
 
@@ -115,10 +114,9 @@ of request ID, vehicle type or resident flag. Protect both with PostgreSQL
 constraints, not application checks alone. Map plate conflicts to the specified
 business error; do not treat exclusivity failures as successful allocation.
 
-A new session is active and its space allocated. PB-03 does not decide when a
-session becomes inactive or a space is released. Those lifecycle definitions
-must be settled in the relevant checkout/payment specs; do not equate the two
-concepts or assume that either checkout or payment releases a space.
+A new session is active and its space allocated. The approved PB-04/PB-05 lifecycle
+now defines inactivity and logical release on paid or free completion; PB-03 does
+not independently redefine these transitions or infer physical departure.
 
 ## Idempotency and transaction guarantees
 
@@ -242,10 +240,10 @@ the full contract. No tests have been implemented or run for this specification.
 4. Define production retention before cleanup. A wholly rolled-back request leaves
    no durable identity/outcome; its delayed retry can still execute. Successful
    replay does not prove current physical presence; gate correlation remains necessary.
-5. Define session inactivity and space release in later lifecycle specifications.
-   Until then, PB-03 only creates active sessions; do not invent a release endpoint.
-6. Pricing contradiction and unsigned legacy payment authentication remain open
-   in the architecture. Neither is resolved or implemented by check-in.
+5. Session inactivity/release is defined by the approved PB-04/PB-05 lifecycle;
+   PB-03 only creates active sessions and adds no release endpoint.
+6. Employer tariff-example and legacy-support clarifications remain external.
+   PB-04 selects published tariffs; PB-05 requires HMAC. Neither is implemented by check-in.
 
 If business clarification is unavailable, approved assumptions must stay explicit,
 justified and revisable. They must never be presented as confirmed requirements.
