@@ -311,3 +311,29 @@ Retrospective entry based on local Git history and development notes.
   Node/TypeScript, PostgreSQL/Docker and shell checks used. Measured elapsed
   wall-clock time through verification: 403 seconds; excludes this journal/final
   response. Exact model and tool/token cost unknown. No commit or push.
+
+## 2026-11-12 — Integration boundary and request coordination review
+
+- **Decisions and attribution:** The user supplied the design-review findings and
+  approved these documentation corrections. Published started-hour tariffs and
+  HMAC-only payment authentication are final developer-selected pilot decisions,
+  not pending employer approvals or vendor-confirmed resolutions. The €5.83 source
+  contradiction remains visible; unsigned legacy terminals remain unsupported
+  because a legacy header does not authenticate the payment provider.
+- **Scope:** Codex clarified that the backend scope includes checkout, settlement
+  and durable session completion, but excludes payment-success delivery to exit
+  controllers and physical barrier commands. Checkout 200 and webhook 204 are not
+  barrier-open commands. The gate notification contract remains unspecified; no
+  endpoint or end-to-end integration is invented or claimed implemented.
+- **Coordination:** Documented transaction-scoped advisory identity locking before
+  outcome lookup, then building/session locks and authoritative state revalidation
+  before mutation. Preliminary session reads serve identification/access only.
+  Deterministic cross-instance key derivation uses separate gate/payment namespaces.
+  Gate outcomes are inserted complete exactly once, never as mutable placeholders;
+  payment identity locking remains separate. These clarify the existing immutable
+  persistence model without adding schema, infrastructure or abstractions.
+- **Verification:** Codex inspected the documentation diff against the gate/provider
+  notes and existing schema. Whitespace, local document links and final-newline
+  checks passed; only the five approved documentation files changed. No runtime
+  tests were run for this documentation-only change. Tools: Codex, Git, shell and
+  Python. Elapsed time, exact model and tool/token cost unknown. No commit or push.

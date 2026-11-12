@@ -15,7 +15,8 @@ Approved tariff decision: visitor cars cost 500 cents per started hour, capped a
 3000 cents per Amsterdam day; motorcycles cost 300 cents, capped at 1800 cents.
 A 70-minute car visit within one day costs 1000 cents. This deliberately follows
 the published tariff rather than the brief's 583-cent example. The discrepancy
-is a known assumption awaiting employer confirmation, not a corrected vendor fact.
+remains a known source contradiction. This is a final developer-selected pilot
+decision, not a vendor-confirmed correction or a pending employer approval.
 All monetary values are integer euro cents.
 
 The lifecycle below is approved pilot behavior. Completion represents
@@ -57,7 +58,7 @@ do not add another hour. Use actual elapsed time across DST changes; calendar da
 need not be 24 hours. No floating-point money or rounding of time before charging.
 Examples: 60 minutes car = 500; 60 minutes plus any positive duration = 1000;
 23:30–00:30 car = 500 + 500, because two local calendar days are involved.
-This daily segmentation is an approved pilot interpretation, subject to employer clarification.
+This daily segmentation is the approved developer-selected pilot interpretation.
 
 Use the stored check-in resident status and vehicle type, never a new tariff
 classification from checkout. Approved: reject a mismatching resident flag with
@@ -93,12 +94,21 @@ Malformed/unauthorized requests and transient 503/500 failures are not terminal
 idempotency results. Unknown sessions cannot create a building-scoped binding.
 
 Processing order: authenticate the credential and authorize its exit-gate role,
-then validate request structure. Derive building scope from trusted gate configuration
-and resolve any existing checkout binding before looking up the supplied session.
+then validate request structure. Derive building scope from trusted gate configuration.
+In the application transaction, acquire the transaction-scoped advisory lock for
+canonical `(building, check-out, X-Request-Id)`, then resolve an existing outcome
+before looking up the supplied session. Key derivation must be deterministic and
+consistent across instances, using the gate-request namespace, separate from
+payment-event keys.
 A matching binding replays; conflicting reuse returns IDEMPOTENCY_KEY_REUSED even
 if the changed session ID is unknown. Only for a new key, look up and authorize
 session access: unknown or inaccessible sessions return 404 without a binding.
 403 denotes gate-role failure, not disclosure of a session in another building.
+Any preliminary session lookup is for identification/access checks only, not an
+authoritative state check. For a new request, acquire the building lock then the
+session lock and revalidate business state before mutation. INSERT the complete
+terminal outcome exactly once before commit; `gate_request_outcomes` never holds
+a pending/placeholder row that is subsequently updated.
 
 For the first valid PARKED checkout, acquire required coordination locks and verify
 session state, then obtain one checkoutAt timestamp from Clock. Use this same
@@ -125,10 +135,12 @@ Errors use PB-03's error envelope: 400 INVALID_REQUEST, 401 UNAUTHENTICATED,
 The gate notes mention acting on the first 2xx and separately require payment
 before opening the exit. They do not fully specify how checkout acknowledgment,
 payment-success notification and physical barrier action interact. A checkout 200
-reports a frozen charge; it is not itself a claim of paid exit eligibility. How
-the exit gate learns payment succeeded remains an unresolved integration question.
-No endpoint, polling, callback or undocumented gate behavior is assumed, and no
-end-to-end barrier integration is claimed.
+reports a frozen charge. Neither checkout 200 nor payment webhook 204 is a
+barrier-open command. Backend scope includes checkout, payment settlement and
+durable completion; payment-success delivery to exit controllers and physical
+barrier commands are excluded. How the exit gate learns payment succeeded remains
+an unresolved integration question. No endpoint, polling, callback or undocumented
+gate behavior is assumed, and no end-to-end barrier integration is claimed.
 
 ## Essential acceptance tests
 
@@ -152,8 +164,9 @@ end-to-end barrier integration is claimed.
 ## External clarification and implementation gate
 
 Lifecycle/release, daily tariff segmentation, duration presentation and resident
-mismatch handling are approved. Employer tariff confirmation and gate
-exit-authorization clarification remain external questions; the latter prevents
-claiming end-to-end barrier integration, not backend implementation under these
-approved assumptions. Commit this specification before implementation.
+mismatch handling are approved. The tariff interpretation is a final developer-selected
+pilot decision despite the conflicting source example. Payment-success delivery to
+exit gates remains unspecified and outside backend scope; this prevents claiming
+end-to-end barrier integration, not backend implementation. Commit this
+specification before implementation.
 No application tests have been executed for this specification.

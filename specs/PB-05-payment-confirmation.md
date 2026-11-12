@@ -48,14 +48,19 @@ claim that every accepted FAILED represents paid parking.
 The unsigned legacy-header request contradicts authenticated provider-only access.
 Approved safe pilot policy: reject missing/invalid signatures even if
 `X-Legacy-Exit: 1` is present. Legacy-only simulator calls should fail authentication.
-Employer/provider clarification of legacy support remains pending;
-no silent bypass or additional integration is introduced.
+This is a final developer-selected pilot decision, not pending employer approval:
+the legacy header proves no identity. Unsigned legacy terminals are unsupported;
+their events cannot establish trusted settlement. This operational limitation is
+accepted to preserve provider authentication; no bypass or new integration is added.
 
 ## Ordering, deduplication and atomicity
 
-Processing order: authenticate and structurally validate, then resolve the existing
-provider/payment-ID binding before session lookup or state evaluation. Replay an
-accepted matching duplicate or reject conflicting reuse, including a changed
+Processing order: authenticate and structurally validate, then start the application
+transaction and acquire a transaction-scoped advisory lock for canonical
+`(provider, paymentId)`. Derive keys deterministically and consistently across
+instances in a payment-event namespace separate from gate-request keys. Resolve
+the existing provider/payment-ID binding before session lookup or state evaluation.
+Replay an accepted matching duplicate or reject conflicting reuse, including a changed
 unknown session ID. Only a new event proceeds to session lookup/state checks and
 atomic processing. Retain accepted payment bindings throughout the pilot.
 
@@ -88,9 +93,12 @@ for investigation, not a refund workflow, queue, worker or additional infrastruc
 Identical redeliveries return 204; conflicting reuse still returns PAYMENT_ID_REUSED.
 
 One application transaction owns attempt binding, applicable charge validation,
-reconciliation designation or payment/session changes and release. Coordinate with checkout using the
-same session and building-lock order; PostgreSQL constraints and locking prevent
-two distinct PAIDs settling/releasing twice. Concurrent exact duplicates replay
+reconciliation designation or payment/session changes and release. Coordinate
+with checkout using the building-then-session lock order after payment-identity locking. Any preliminary
+session lookup is only for identification/access; revalidate business state under
+these locks before applying a new event. INSERT its complete immutable accepted
+binding once, never a pending row followed by UPDATE. PostgreSQL constraints and
+locking prevent two distinct PAIDs settling/releasing twice. Concurrent exact duplicates replay
 after commit; rollback leaves no new accepted attempt or partial release. Bound
 database waits; 503 is transient and not a terminal deduplication result. A lost
 commit acknowledgment is reconciled through the original payment ID.
@@ -135,8 +143,11 @@ replace accepted bindings. Non-2xx errors do not tell the provider to stop retry
 
 HMAC-only authentication, settlement/reconciliation policies, uncached pre-checkout
 409 with its 24-hour redelivery limitation and the shared lifecycle are approved.
-External legacy-support clarification remains open; unsigned calls are rejected
-under the approved pilot policy. How the gate learns payment success remains
-unresolved; no endpoint or callback is assumed and no end-to-end barrier integration
-is claimed. Commit this specification before implementation.
+HMAC-only authentication is a final developer-selected pilot decision; unsigned
+legacy terminals remain unsupported. Backend scope covers settlement and durable
+session completion, but excludes payment-success delivery to exit controllers and
+physical barrier commands. Checkout 200 and webhook 204 are not barrier-open
+commands. How the gate learns payment success remains unresolved; no endpoint or
+callback is assumed and no end-to-end barrier integration is claimed. Commit this
+specification before implementation.
 Tests above are planned, not executed.

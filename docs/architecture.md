@@ -22,9 +22,10 @@ See [the brief](../BRIEF.md) for the requirements and its pricing contradiction.
 - **Simulator:** an external test client for signed confirmations, retries, failed
   attempts, out-of-order delivery and legacy calls. See [simulator documentation](../simulator/README.md).
 
-The API records parking and payment effects in PostgreSQL. No outbound payment
-initiation or barrier-control integration is assumed; the gate's payment-status
-integration is not yet specified.
+The backend scope covers checkout, payment settlement and durable session completion
+in PostgreSQL. It excludes outbound payment initiation, delivery of payment success
+to exit-gate controllers and physical barrier commands. Checkout 200 and webhook
+204 are not barrier-open commands; business endpoints remain to be implemented.
 
 ## Architectural decisions
 
@@ -37,7 +38,7 @@ chosen implementation decisions, not technologies mandated by the brief.
 | Module | Responsibilities |
 | --- | --- |
 | Parking | Allocation, session lifecycle, eligibility policies, plate normalization, gate-request idempotency and public occupancy reads. Owns space exclusivity. |
-| Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. Pilot tariff interpretation is approved and documented in PB-04; employer confirmation of the contradictory €5.83 example remains pending. |
+| Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. The final developer-selected pilot tariff is documented in PB-04; the contradictory €5.83 source example remains noted, not an approval dependency. |
 | Payments | Payment-attempt identity, duplicate/conflicting confirmations and payment-state rules. A late failed attempt must not undo a different successful payment. |
 
 Keep allocation and sessions together because their invariants are tightly coupled.
@@ -82,6 +83,22 @@ conflicting payload instead of silently replaying or applying another operation.
 Apply equivalent identity/conflict handling to payment confirmations. Exact key
 scope, conflict responses and retention belong in feature specifications.
 
+Gate coordination order, after authentication and structural validation:
+transaction-scoped advisory lock for canonical `(building, operation, requestId)`,
+then outcome lookup/replay or payload-conflict rejection. For a new request,
+acquire the building lock, then any required session lock, revalidate business
+state and perform the operation. Any preliminary session lookup is only for
+identification/access checks, never authoritative business state. INSERT the
+complete terminal outcome exactly once before commit. `gate_request_outcomes`
+contains only immutable terminal outcomes: no pending/placeholder row or UPDATE.
+
+Payment events use a separate advisory-lock namespace for canonical
+`(provider, paymentId)`, followed by accepted-binding lookup and, for a new event,
+the same building-then-session lock order and state revalidation. Advisory keys
+must be derived deterministically and consistently across application instances;
+gate-request and payment-event namespaces must be distinct. Locks are held until
+transaction end.
+
 Use PostgreSQL constraints as a final protection for exclusivity and identity,
 with deliberate locking or conditional writes. Start with short READ COMMITTED
 transactions and validate the locking strategy through concurrent tests; an
@@ -124,16 +141,19 @@ lint, tests and a dependency audit as required by the assignment.
 
 ## Approved pilot decisions and external clarification
 
-Pilot decisions below are approved; external clarification remains where noted:
+Pilot decisions below are approved; source contradictions and integration limits
+are distinguished from externally confirmed requirements:
 
 - Approved pilot lifecycle: billing freezes at checkout; paid or free completion
   deactivates the session and releases logical allocation. Physical departure is
   not observed; no physical-exit callback is defined.
 - Approved pilot tariff: started hours and caps per Amsterdam calendar day, in
-  integer cents. The conflicting 583-cent example awaits employer confirmation;
-  detailed boundaries are specified in PB-04.
-- Approved pilot policy rejects unsigned legacy webhooks. Employer/provider
-  clarification of legacy support remains open; the legacy header proves no identity.
+  integer cents. This final developer-selected interpretation follows the published
+  tariff despite the conflicting 583-cent source example; no employer approval is
+  required to implement it. Detailed boundaries are specified in PB-04.
+- Final developer-selected pilot policy rejects unsigned legacy webhooks: the
+  legacy header proves no identity. Unsigned legacy terminals are unsupported;
+  their payment events cannot produce trusted backend settlement.
 - Resident entitlement remains externally unverified; the pilot accepts gate-asserted
   residency and rejects a mismatching checkout flag as specified in PB-04.
 - PB-05 specifies PAID settlement matching, mismatch-tolerant FAILED recording,
@@ -143,8 +163,10 @@ Pilot decisions below are approved; external clarification remains where noted:
 ### Open integration question: exit-gate payment notification
 
 How does the exit gate learn that payment succeeded? The supplied contract does
-not define this interaction. No endpoint or notification mechanism is assumed;
-backend approval does not establish end-to-end barrier integration.
+not define this interaction. Payment-success delivery and physical barrier commands
+are outside the backend pilot scope, not blockers for backend implementation. No
+endpoint or notification mechanism is invented; end-to-end barrier integration
+is not claimed.
 
 If clarification is unavailable, record explicit, justified and revisable
 assumptions in the relevant reviewed feature specifications before implementation.

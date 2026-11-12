@@ -144,9 +144,13 @@ binding, including after rejection; it does not change the bound outcome.
 One application transaction coordinates the following logical steps; this is a
 behavioral/concurrency contract, not a table or class design:
 
-1. Create or lock the uniquely constrained key binding. Concurrent duplicates
-   coordinate through PostgreSQL and bounded waits, across application instances.
-2. Compare canonical payload; conflict returns 409 without changing the binding.
+1. Acquire a transaction-scoped PostgreSQL advisory lock for the canonical
+   `(building, check-in, X-Request-Id)` identity, then look up an existing outcome.
+   Derive keys deterministically and consistently across application instances,
+   in the gate-request namespace, separate from payment-event keys. Concurrent
+   duplicates coordinate with bounded waits; do not insert a placeholder binding.
+2. If an outcome exists, compare canonical payload; conflict returns 409 without
+   changing the binding.
    If success or terminal rejection exists, replay it without allocation or other
    session mutation.
 3. Acquire a short transaction-scoped building allocation lock, then read current
@@ -158,12 +162,15 @@ behavioral/concurrency contract, not a table or class design:
 6. Otherwise create one active session, allocate the lowest eligible space and
    persist the binding and original response atomically. Commit before returning 201.
 
-No independently committed processing claim, lease, Redis, external distributed
-lock service or nested transaction is needed. Any in-transaction key claim is
-committed only with a terminal business outcome, or disappears on rollback.
-All availability-changing operations, including future release operations, must
-follow the same building-lock protocol and consistent lock ordering. Database
-constraints remain the final safeguard. Do not use SKIP LOCKED to infer fullness.
+`gate_request_outcomes` stores only complete, immutable terminal outcomes. INSERT
+one complete outcome exactly once before commit; never insert a pending row and
+then UPDATE it. No independently committed processing state, lease, Redis,
+external lock service or nested transaction is needed. Lock order is request
+identity, building, then any required session lock. Any preliminary session lookup
+serves identification/access only; revalidate business state under the required
+building/session locks before mutation. All availability-changing operations,
+including release, must follow the same building-lock protocol and lock order.
+Database constraints remain the final safeguard. Do not use SKIP LOCKED to infer fullness.
 
 If the first transaction rolls back, its new binding and parking effects all
 disappear; a waiter can proceed and evaluate the operation. There is no durable
@@ -242,8 +249,10 @@ the full contract. No tests have been implemented or run for this specification.
    replay does not prove current physical presence; gate correlation remains necessary.
 5. Session inactivity/release is defined by the approved PB-04/PB-05 lifecycle;
    PB-03 only creates active sessions and adds no release endpoint.
-6. Employer tariff-example and legacy-support clarifications remain external.
-   PB-04 selects published tariffs; PB-05 requires HMAC. Neither is implemented by check-in.
+6. PB-04's published tariff interpretation and PB-05's HMAC-only policy are final
+   developer-selected pilot decisions, not pending employer approvals. The tariff
+   source contradiction and unsupported unsigned legacy calls remain documented
+   limitations. Neither policy is implemented by check-in.
 
 If business clarification is unavailable, approved assumptions must stay explicit,
 justified and revisable. They must never be presented as confirmed requirements.
