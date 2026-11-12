@@ -108,3 +108,23 @@ Written after the work, using local Git history and the development conversation
   documentation checks and web research of official PostgreSQL documentation.
   Exact model identifier is unknown from the available evidence.
 - **Time/cost:** Unknown; no reliable duration or cost measurements are available.
+
+## 2026-11-12 — PB-03 terminal-full simplification
+
+- **Decision and rationale:** The human reviewer approved terminal PARKING_FULL
+  replay after revisiting the gate contract, which specifies same-ID retries
+  when no response arrives but does not establish retries after explicit full
+  responses. Codex revised the specification; the revised text awaits final review.
+- **Trade-off:** A rejected event continues to receive its original 409 even
+  after capacity becomes available. A new admission requires a new vehicle event
+  and UUID. This replaces the previously approved retry window and expiry
+  lifecycle with stable outcome replay.
+- **Preserved guarantees:** Successful and duplicate-plate outcome replay,
+  canonical payload conflicts, PostgreSQL coordination, space exclusivity and
+  active-plate uniqueness. A wholly rolled-back request leaves no durable outcome.
+  Transient infrastructure failures, including 503, are not terminal idempotency results.
+- **Verification:** Documentation consistency review, local-link checks,
+  whitespace/final-newline checks and `git diff --check` passed. No application
+  code or runtime tests were implemented or executed.
+- **Tools/time/cost:** Codex, Git and shell/Python checks. Exact model identifier,
+  elapsed time and cost are unknown.
