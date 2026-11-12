@@ -1,0 +1,550 @@
+{
+  "id": "cd0f5369-960d-49b2-a4ed-8ce13ab40174",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.buildings": {
+      "name": "buildings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "building_identity_nonempty": {
+          "name": "building_identity_nonempty",
+          "value": "length(\"buildings\".\"id\") > 0 and length(\"buildings\".\"timezone\") > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.gate_request_outcomes": {
+      "name": "gate_request_outcomes",
+      "schema": "",
+      "columns": {
+        "building_id": {
+          "name": "building_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "operation": {
+          "name": "operation",
+          "type": "gate_operation",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "canonical_payload": {
+          "name": "canonical_payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_status": {
+          "name": "response_status",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "response_body": {
+          "name": "response_body",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "gate_request_outcomes_building_id_buildings_id_fk": {
+          "name": "gate_request_outcomes_building_id_buildings_id_fk",
+          "tableFrom": "gate_request_outcomes",
+          "tableTo": "buildings",
+          "columnsFrom": [
+            "building_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "gate_request_outcomes_building_id_session_id_parking_sessions_building_id_id_fk": {
+          "name": "gate_request_outcomes_building_id_session_id_parking_sessions_building_id_id_fk",
+          "tableFrom": "gate_request_outcomes",
+          "tableTo": "parking_sessions",
+          "columnsFrom": [
+            "building_id",
+            "session_id"
+          ],
+          "columnsTo": [
+            "building_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "gate_request_outcomes_building_id_operation_request_id_pk": {
+          "name": "gate_request_outcomes_building_id_operation_request_id_pk",
+          "columns": [
+            "building_id",
+            "operation",
+            "request_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "gate_payload_objects": {
+          "name": "gate_payload_objects",
+          "value": "jsonb_typeof(\"gate_request_outcomes\".\"canonical_payload\") = 'object' and jsonb_typeof(\"gate_request_outcomes\".\"response_body\") = 'object'"
+        },
+        "gate_terminal_outcome": {
+          "name": "gate_terminal_outcome",
+          "value": "\n    (\"gate_request_outcomes\".\"operation\" = 'CHECK_IN' and \"gate_request_outcomes\".\"response_status\" = 201 and \"gate_request_outcomes\".\"session_id\" is not null)\n    or (\"gate_request_outcomes\".\"operation\" = 'CHECK_OUT' and \"gate_request_outcomes\".\"response_status\" = 200 and \"gate_request_outcomes\".\"session_id\" is not null)\n    or (\"gate_request_outcomes\".\"response_status\" = 409 and \"gate_request_outcomes\".\"response_body\"->'error'->>'code' is not null\n      and ((\"gate_request_outcomes\".\"operation\" = 'CHECK_IN' and \"gate_request_outcomes\".\"response_body\"->'error'->>'code' in ('PARKING_FULL', 'VEHICLE_ALREADY_CHECKED_IN'))\n        or (\"gate_request_outcomes\".\"operation\" = 'CHECK_OUT' and \"gate_request_outcomes\".\"response_body\"->'error'->>'code' = 'RESIDENT_STATUS_MISMATCH')))\n  "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.parking_sessions": {
+      "name": "parking_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "building_id": {
+          "name": "building_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "space_id": {
+          "name": "space_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_plate": {
+          "name": "normalized_plate",
+          "type": "varchar(16)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vehicle_type": {
+          "name": "vehicle_type",
+          "type": "vehicle_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_resident": {
+          "name": "is_resident",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "session_state",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'PARKED'"
+        },
+        "check_in_at": {
+          "name": "check_in_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "checkout_at": {
+          "name": "checkout_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_minutes": {
+          "name": "duration_minutes",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "charge_cents": {
+          "name": "charge_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "one_active_plate_per_building": {
+          "name": "one_active_plate_per_building",
+          "columns": [
+            {
+              "expression": "building_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "normalized_plate",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"parking_sessions\".\"state\" in ('PARKED', 'AWAITING_PAYMENT')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "one_active_allocation_per_space": {
+          "name": "one_active_allocation_per_space",
+          "columns": [
+            {
+              "expression": "building_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "space_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"parking_sessions\".\"state\" in ('PARKED', 'AWAITING_PAYMENT')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "parking_sessions_building_id_space_id_spaces_building_id_id_fk": {
+          "name": "parking_sessions_building_id_space_id_spaces_building_id_id_fk",
+          "tableFrom": "parking_sessions",
+          "tableTo": "spaces",
+          "columnsFrom": [
+            "building_id",
+            "space_id"
+          ],
+          "columnsTo": [
+            "building_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "session_building_identity": {
+          "name": "session_building_identity",
+          "nullsNotDistinct": false,
+          "columns": [
+            "building_id",
+            "id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "plate_is_normalized": {
+          "name": "plate_is_normalized",
+          "value": "\"parking_sessions\".\"normalized_plate\" ~ '^[A-Z0-9]{1,16}$'"
+        },
+        "session_lifecycle": {
+          "name": "session_lifecycle",
+          "value": "\n    (\"parking_sessions\".\"state\" = 'PARKED' and \"parking_sessions\".\"checkout_at\" is null and \"parking_sessions\".\"duration_minutes\" is null\n      and \"parking_sessions\".\"charge_cents\" is null and \"parking_sessions\".\"completed_at\" is null)\n    or (\"parking_sessions\".\"state\" in ('AWAITING_PAYMENT', 'COMPLETED')\n      and \"parking_sessions\".\"checkout_at\" is not null and \"parking_sessions\".\"checkout_at\" >= \"parking_sessions\".\"check_in_at\"\n      and \"parking_sessions\".\"duration_minutes\" is not null and \"parking_sessions\".\"duration_minutes\" >= 0\n      and \"parking_sessions\".\"duration_minutes\" = floor(extract(epoch from (\"parking_sessions\".\"checkout_at\" - \"parking_sessions\".\"check_in_at\")) / 60)\n      and \"parking_sessions\".\"charge_cents\" is not null and \"parking_sessions\".\"charge_cents\" between 0 and 9007199254740991\n      and (not \"parking_sessions\".\"is_resident\" or \"parking_sessions\".\"charge_cents\" = 0)\n      and ((\"parking_sessions\".\"state\" = 'AWAITING_PAYMENT' and \"parking_sessions\".\"charge_cents\" > 0 and \"parking_sessions\".\"completed_at\" is null)\n        or (\"parking_sessions\".\"state\" = 'COMPLETED' and \"parking_sessions\".\"completed_at\" is not null and \"parking_sessions\".\"completed_at\" >= \"parking_sessions\".\"checkout_at\")))\n  "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.payment_events": {
+      "name": "payment_events",
+      "schema": "",
+      "columns": {
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payment_id": {
+          "name": "payment_id",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "building_id": {
+          "name": "building_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "payment_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "disposition": {
+          "name": "disposition",
+          "type": "payment_disposition",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "one_applied_settlement_per_session": {
+          "name": "one_applied_settlement_per_session",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"payment_events\".\"disposition\" = 'SETTLED'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payment_events_building_id_session_id_parking_sessions_building_id_id_fk": {
+          "name": "payment_events_building_id_session_id_parking_sessions_building_id_id_fk",
+          "tableFrom": "payment_events",
+          "tableTo": "parking_sessions",
+          "columnsFrom": [
+            "building_id",
+            "session_id"
+          ],
+          "columnsTo": [
+            "building_id",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "payment_events_provider_id_payment_id_pk": {
+          "name": "payment_events_provider_id_payment_id_pk",
+          "columns": [
+            "provider_id",
+            "payment_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "payment_values": {
+          "name": "payment_values",
+          "value": "length(\"payment_events\".\"provider_id\") > 0 and length(\"payment_events\".\"payment_id\") > 0\n    and \"payment_events\".\"amount_cents\" between 0 and 9007199254740991 and \"payment_events\".\"currency\" ~ '^[A-Z]{3}$'"
+        },
+        "payment_disposition_matches_status": {
+          "name": "payment_disposition_matches_status",
+          "value": "\n    (\"payment_events\".\"status\" = 'FAILED' and \"payment_events\".\"disposition\" = 'FAILED')\n    or (\"payment_events\".\"status\" = 'PAID' and \"payment_events\".\"disposition\" = 'RECONCILIATION_REQUIRED')\n    or (\"payment_events\".\"status\" = 'PAID' and \"payment_events\".\"disposition\" = 'SETTLED' and \"payment_events\".\"currency\" = 'EUR' and \"payment_events\".\"amount_cents\" > 0)\n  "
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.spaces": {
+      "name": "spaces",
+      "schema": "",
+      "columns": {
+        "building_id": {
+          "name": "building_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "floor": {
+          "name": "floor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "space_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "spaces_building_id_buildings_id_fk": {
+          "name": "spaces_building_id_buildings_id_fk",
+          "tableFrom": "spaces",
+          "tableTo": "buildings",
+          "columnsFrom": [
+            "building_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "spaces_building_id_id_pk": {
+          "name": "spaces_building_id_id_pk",
+          "columns": [
+            "building_id",
+            "id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "space_positive": {
+          "name": "space_positive",
+          "value": "\"spaces\".\"id\" > 0 and \"spaces\".\"floor\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.gate_operation": {
+      "name": "gate_operation",
+      "schema": "public",
+      "values": [
+        "CHECK_IN",
+        "CHECK_OUT"
+      ]
+    },
+    "public.payment_disposition": {
+      "name": "payment_disposition",
+      "schema": "public",
+      "values": [
+        "FAILED",
+        "SETTLED",
+        "RECONCILIATION_REQUIRED"
+      ]
+    },
+    "public.payment_status": {
+      "name": "payment_status",
+      "schema": "public",
+      "values": [
+        "PAID",
+        "FAILED"
+      ]
+    },
+    "public.session_state": {
+      "name": "session_state",
+      "schema": "public",
+      "values": [
+        "PARKED",
+        "AWAITING_PAYMENT",
+        "COMPLETED"
+      ]
+    },
+    "public.space_category": {
+      "name": "space_category",
+      "schema": "public",
+      "values": [
+        "RESIDENT",
+        "CAR",
+        "MOTOR"
+      ]
+    },
+    "public.vehicle_type": {
+      "name": "vehicle_type",
+      "schema": "public",
+      "values": [
+        "CAR",
+        "MOTOR"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

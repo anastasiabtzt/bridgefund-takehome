@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794484348956,
+      "tag": "0000_parking_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794484459120,
+      "tag": "0001_history_guards",
+      "breakpoints": true
+    }
+  ]
+}

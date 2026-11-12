@@ -1,0 +1,45 @@
+name: Backend checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres-test:
+        image: postgres:17
+        env:
+          POSTGRES_USER: parkingbusiness_test
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: parkingbusiness_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U parkingbusiness_test -d parkingbusiness_test"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      DATABASE_URL: postgresql://parkingbusiness:unused@127.0.0.1:5432/parkingbusiness
+      TEST_DATABASE_URL: postgresql://parkingbusiness_test:ci-test-only@127.0.0.1:5433/parkingbusiness_test
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            simulator/package-lock.json
+      - run: npm install --global npm@11.19.1 --ignore-scripts
+      - run: npm ci --ignore-scripts --no-audit
+      - run: npm ci --prefix simulator --ignore-scripts --no-audit
+      - run: npm run build
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm test --prefix simulator
+      - run: npm run audit:dependencies

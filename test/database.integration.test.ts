@@ -2,13 +2,10 @@ import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { sql } from 'drizzle-orm';
-import { loadConfig } from '../src/config.js';
-import { DatabaseService } from '../src/database/database.service.js';
+import { openTestDatabase } from './support/test-database.js';
 
 test('connects to real PostgreSQL through the application pg/Drizzle connection', async () => {
-  assert.ok(process.env.TEST_DATABASE_URL, 'TEST_DATABASE_URL is required; this test never silently skips.');
-  const config = loadConfig({ ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL });
-  const database = new DatabaseService(config);
+  const database = await openTestDatabase();
   try {
     await database.onModuleInit();
     const result = await database.db.execute<{ connected: number; version: string }>(
@@ -19,7 +16,7 @@ test('connects to real PostgreSQL through the application pg/Drizzle connection'
     const settings = await database.pool.query<{ setting: string }>(
       "select setting from pg_settings where name = 'statement_timeout'",
     );
-    assert.equal(Number(settings.rows[0].setting), config.statementTimeoutMs);
+    assert.equal(Number(settings.rows[0].setting), Number(process.env.DB_STATEMENT_TIMEOUT_MS ?? 1000));
   } finally {
     await database.onModuleDestroy();
   }

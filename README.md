@@ -1,8 +1,9 @@
 # ParkingBusiness
 
 NestJS + TypeScript modular-monolith backend with PostgreSQL and Drizzle.
-Checkpoint 1 provides startup/configuration, a connection pool, Clock and a real
-database smoke test. No business endpoints, tables or migrations exist yet.
+The foundation includes startup/configuration, Clock, reviewed SQL migrations,
+deterministic pilot seed, database constraint tests and CI. Business endpoints
+remain unimplemented.
 
 ## Local setup
 
@@ -12,6 +13,8 @@ Requires Node.js 24, npm 11 and Docker with Compose. PostgreSQL 17 is used local
 npm ci --ignore-scripts
 cp .env.example .env
 npm run db:up
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
@@ -25,15 +28,62 @@ local startup: `npm run build` then `npm start`.
 npm run lint
 npm test
 npm run test:integration
+npm test --prefix simulator
+npm run audit:dependencies
 npm run db:down
 ```
 
-The integration test requires `TEST_DATABASE_URL` and executes read-only queries
-against a real PostgreSQL server; it does not silently skip without a database.
-For this smoke test it may use the development database. Checkpoint 2 will add an
-isolated test database before any destructive setup, migrations or race tests.
-Compose keeps data across stops; its credentials are public local-only defaults.
-Port 5432 must be available. Real `.env` files are ignored; do not commit secrets.
+Install the independent simulator with `npm ci --prefix simulator --ignore-scripts`.
+Compose runs development PostgreSQL on port 5432 with a persistent volume, and a
+separate disposable test server on port 5433 with tmpfs data. Both bind loopback.
+Credentials are public local-only defaults; real `.env` files are ignored.
+
+Integration tests **reset the test database**, then run real migrations and seed.
+They require `TEST_DATABASE_URL`, database/user `parkingbusiness_test`, no URL query
+parameters, and a different configured development target. The live server's
+database/user identity is checked before any reset. Wrong/missing configuration
+fails rather than skipping tests. Do not rename a development database to the test
+identity or point tests at data you need. `npm run db:test:fresh` recreates only the
+disposable test service; it never removes the development service or volume.
+
+Keep an existing `.env` in sync with the new test URL in `.env.example`; the old
+Checkpoint 1 smoke-test URL intentionally fails the new guard. Integration files
+run serially; concurrency tests acquire separate PostgreSQL connections and
+exercise uncommitted unique-index contention without assuming timing via sleeps.
+Two simultaneous local integration-test runs must not share this disposable
+database: each run resets its schemas and could invalidate the other's fixtures.
+Run them sequentially or use separately isolated PostgreSQL instances. Settlement
+tests reserve three connections (default pool size is five), prove blocking via
+`pg_blocking_pids`, use actual COMMIT and read final state through a third connection.
+
+## Persistence and migrations
+
+`src/database/schema.ts` defines the five domain tables. `npm run db:generate`
+generates SQL and Drizzle snapshots; review SQL before committing, then run
+`npm run db:migrate`. Never use schema push or auto-migrate at app startup.
+`drizzle/0001_history_guards.sql` is a reviewed custom migration: append-only gate
+outcomes/payment events, frozen session facts/checkout, forward-only transitions
+and deferred settlement/session consistency. Keep those guards when adding future
+migrations; generated snapshots do not describe custom triggers.
+
+Sessions are the allocation source of truth. Partial unique indexes enforce one
+active plate per building and one active allocation per building/space. Composite
+foreign keys prevent cross-building references. Money uses bigint integer cents
+bounded to JavaScript's safe-integer range. Constraints protect lifecycle shape;
+the future Billing domain will calculate tariffs. Deferred consistency checks let
+one transaction update payment and session in either write order, but reject an
+inconsistent commit. Privileged administrators can bypass guards; normal application
+SQL must not disable them. Constraint triggers add no endpoint or background worker.
+
+`npm run db:seed` inserts `PB-AMS-9X4T` and IDs 1–150, with floors/eligibility from
+the approved layout. Re-running inserts missing rows without updating existing
+configuration, sessions, request outcomes or payment events. After inserting missing
+records, seed validates the timezone and exact 150-space layout, including floors
+and encoded vehicle eligibility. A mismatch fails with a non-sensitive error and
+rolls back all seed inserts; it never repairs drift or deletes operational data.
+Migration/seed commands
+run from the repository root and target DATABASE_URL; test resets use only the
+separate guarded TEST_DATABASE_URL.
 
 ## Configuration and initial limits
 
@@ -62,9 +112,17 @@ Node's test runner avoids another test framework. Installs disable lifecycle scr
 the platform-specific esbuild package used by tsx works without running them.
 
 Current dependency audit: production dependencies have no reported vulnerabilities;
-the lint toolchain has moderate minimatch advisories. See the checkpoint journal
-for triage. Reassess before Checkpoint 2's audit CI; no forced upgrades were applied.
+the lint toolchain has a moderate minimatch advisory and Drizzle Kit's transitive
+esbuild loader has a moderate development-server advisory. `npm run audit:dependencies`
+runs native npm audits for both lockfiles. Only GHSA-g3hv-75wg-m249 and
+GHSA-67mh-4wv8-2f99 are deferred for dev-only paths until review before 2026-11-19:
+lint uses fixed local globs, and esbuild serve/Drizzle Studio is not exposed. New
+advisories, runtime findings, failed audit requests and expired exceptions fail CI.
+No forced upgrades or global severity suppression. The simulator's Axios was
+updated to a stable audited version; its signed HTTP transport is tested locally.
+
+GitHub Actions uses PostgreSQL 17 and runs lockfile installs, build, lint (including
+simulator), unit/integration tests, simulator tests and the scoped dependency audit.
 
 See [architecture](docs/architecture.md), [specifications](specs/PB-03-check-in.md),
-[agent instructions](AGENTS.md) and [journal](JOURNAL.md). CI, migrations and seed
-data belong to Checkpoint 2.
+[agent instructions](AGENTS.md) and [journal](JOURNAL.md).

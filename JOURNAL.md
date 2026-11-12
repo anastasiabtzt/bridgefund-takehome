@@ -8,7 +8,7 @@ user reports and assumptions; mark unavailable measurements as unknown.
 
 ## 2026-11-11 — Retrospective: repository and agent workflow setup
 
-Written after the work, using local Git history and the development conversation.
+Retrospective entry based on local Git history and development notes.
 
 - **Repository:** Restored the supplied bundle into the existing empty workspace,
   preserving original commit `a5004f917b036ca6161a2379cbf623d954b3d9a1`.
@@ -20,16 +20,13 @@ Written after the work, using local Git history and the development conversation
   The user refined the proposal to use selective test-first development,
   semantic commit boundaries and pragmatic DDD. PB-03–PB-06 specs require review
   and a commit before implementation; commits and pushes require explicit approval.
-- **AI contribution and corrections:** ChatGPT supported private requirements
-  discussion, workflow design trade-offs and review. Codex inspected the repository,
-  authored the workflow files and performed local Git verification. The user made
-  the decisions, approved changes and performed the push. User review prompted explicit DDD guidance,
-  an explicit relative skill link and a narrower rule for specification updates:
-  material behavior/acceptance changes require a new reviewed spec commit;
-  routine implementation details do not. An early audit command in the supplied
-  bundle directory resolved to an unrelated home-directory repository. The agent
-  identified this risk; subsequent Git mutations were confined to the verified
-  assignment checkout.
+- **AI contribution and corrections:** ChatGPT was used for requirements and
+  architecture discussion and technical review; Codex inspected the repository,
+  drafted the workflow files and ran local checks. The developer selected and
+  approved the approach. Review led to clearer DDD guidance, an explicit skill
+  link and a rule requiring a reviewed spec commit for material behavior changes.
+  An initial Git check ran outside the assignment repository; subsequent Git
+  operations used the verified checkout.
 - **Verification:** The bundle was verified as complete during setup. Workflow
   commit `af75ff180b90f541c204b7a36b2ea74e054f316c` contains only `AGENTS.md`
   and `.agents/skills/feature-workflow/SKILL.md` (74 added lines); its parent is
@@ -37,17 +34,14 @@ Written after the work, using local Git history and the development conversation
   whitespace check passed. The skill validator could not run because Python's
   `yaml` module was unavailable; no dependency was installed. No application tests
   were run for these instruction files.
-- **Current evidence and limits:** Local history confirms both commits; `main`
-  matches the locally cached `origin/main`, and the tree was clean before this
-  journal was added. The user reports the workflow commit has been pushed.
-  The user reports that after the push, ChatGPT independently retrieved and
-  reviewed both workflow files through the connected GitHub integration. That
-  content review did not independently verify repository privacy or the exact
-  remote commit SHA; Codex did not repeat that integration check here.
-  The procedure has been created; actual use on a feature remains to be recorded.
-- **Tools/models:** ChatGPT, Codex, WebStorm, Git, shell/Python tools, the bundled `skill-creator`
-  guidance and web review of Addy Osmani's four proposed engineering skills.
-  Exact model identifiers are unknown from the available evidence.
+- **Current evidence and limits:** Local Git history and staged-file checks
+  confirmed the workflow commit and its scope. A separate review checked the
+  committed workflow documents; repository privacy and remote commit identity
+  were not established by that content review. The workflow was documented but
+  had not yet been exercised on an application feature.
+- **Tools/models:** ChatGPT, Codex, WebStorm, Git, shell/Python tools,
+  bundled `skill-creator` guidance and external engineering references.
+  Exact model identifiers are not recorded.
 - **Time/cost:** Unknown. No reliable elapsed-time or cost measurements were
   recorded; commit timestamps are not a measure of effort.
 
@@ -227,3 +221,93 @@ Written after the work, using local Git history and the development conversation
   Measured elapsed wall-clock interval through verification: 666 seconds,
   including installs, waits and corrections; excludes this journal/final response.
   Exact model identifier and tool/token cost are unavailable.
+
+## 2026-11-12 — Checkpoint 2: persistence, isolated tests and CI
+
+- **Scope and decisions:** The user authorized the five-table persistence model,
+  migrations, safe seed and CI after Checkpoint 1 (`db41b52`). Codex implemented
+  Drizzle schema and generated/reviewed SQL plus a custom history-guard migration;
+  this implementation awaits user review. Sessions remain the allocation source
+  of truth: partial unique indexes cover active plates and spaces per building;
+  composite foreign keys prevent cross-building references. Integer cents are
+  bounded to JavaScript-safe values. No endpoint, repository abstraction or worker.
+- **Lifecycle protection:** Row checks enforce checkout timestamps/duration,
+  resident zero charge and state shape. SQL guards preserve session identity,
+  frozen checkout and forward-only transitions; request outcomes/payment bindings
+  are append-only. Deferred checks permit settlement and completion in one
+  transaction while rejecting inconsistent commits. FAILED accepts mismatched
+  amount/currency after checkout; extra PAID records can require reconciliation.
+  Tariff calculation and HTTP/idempotency orchestration remain future work.
+- **Seed and safety:** Seed inserts the pilot and 150 correctly ranged/floored
+  spaces without overwriting configuration or operational records. Tests verify
+  preservation of existing sessions, gate outcomes and payment events. Added a
+  separate tmpfs PostgreSQL test service/database/user. Tests validate URL and live
+  identity before schema reset. A deliberate development-URL test run was refused;
+  development still has zero public tables. Added .DS_Store to ignore rules.
+- **Test-first evidence and corrections:** Initial database tests exposed absent
+  append-only, lifecycle-history and settlement guards before their SQL was added.
+  Added guards and corrected a resident test fixture to create resident identity
+  initially rather than mutate immutable check-in facts. Linting the simulator
+  exposed missing Node URL globals in ESLint configuration; corrected the config.
+- **Executed verification:** Clean root and simulator installs with
+  `npm ci --ignore-scripts --no-audit` (temporary npm cache); build, lint including
+  simulator, and 5 unit tests passed. `npm run db:test:fresh` recreated only the
+  disposable test server. With TEST_DATABASE_URL pointing to port 5433 and
+  parkingbusiness_test, `npm run test:integration` passed all 27 checks on a fresh
+  database. Separate backend connections demonstrated unique-index blocking and
+  rejection. `npm test --prefix simulator` passed 10 tests, including signed HTTP
+  transport/retries through Axios. Migration check/generation reported no schema
+  drift; migration CLI and seed CLI reruns passed. Compose and CI YAML parsed;
+  whitespace, JSON and document-link checks passed. GitHub-hosted CI has not run.
+- **Audit triage:** Added native npm audit checks for both lockfiles. Upgraded the
+  simulator's Axios from 0.21.1 to stable 1.21.1; simulator audit is clean and
+  transport compatibility was tested. Application production audit is clean.
+  Full application audit reports 14 moderate dev-tool findings rooted in two
+  advisories: minimatch GHSA-g3hv-75wg-m249 and Drizzle Kit's transitive esbuild
+  GHSA-67mh-4wv8-2f99. Proposed narrow dev-only exceptions expire for review on
+  2026-11-19: fixed lint globs, no esbuild server/Studio exposure. New/runtime
+  advisories, audit failures and expiry fail CI; unit tests cover that policy.
+  No forced downgrades, major overrides or blanket severity suppression.
+- **Limitations and next step:** Local equivalents passed; remote CI execution
+  awaits a user push. Custom SQL triggers need manual review in future schema
+  migrations and can be bypassed by privileged administrators. Seed preserves,
+  rather than repairs, manually changed configuration. Both local PostgreSQL
+  services remain running. Business endpoints, use-case locks, billing and
+  gate/payment integration are not implemented or claimed verified.
+- **Tools/time/cost:** Codex, Git, Node/npm, Drizzle Kit 0.31.11, PostgreSQL 17,
+  Docker Compose, ESLint/TypeScript, shell/Python/Ruby and official documentation.
+  Measured elapsed wall-clock time through verification: 1188 seconds, including
+  installs, research, waits and corrections; excludes this journal/final response.
+  Exact model identifier and tool/token cost are unavailable.
+
+## 2026-11-12 — Checkpoint 2 targeted seed and concurrency corrections
+
+- **Requested correction:** The user supplied review findings and authorized only
+  seed validation, deferred-settlement concurrency tests and documentation. Codex
+  applied these corrections; they await review. Existing SQL triggers, schema,
+  architecture and specifications were not changed.
+- **Seed:** Insert missing records, then validate timezone and exactly 150 pilot
+  spaces against IDs, floors and category-encoded vehicle eligibility. Drift now
+  raises a clear non-sensitive error and rolls back the seed transaction instead
+  of silently accepting or overwriting configuration. Tests cover clean/repeated
+  seed, operational-data preservation, wrong timezone/floor/eligibility/vehicle type
+  and extra spaces. Whole-database snapshots prove failed validation also rolls
+  back attempted insertion of a missing space without changing operational data.
+- **Concurrency evidence:** Three distinct PostgreSQL connections, observed
+  pg_blocking_pids and actual COMMIT operations establish controlled overlap and
+  verify final state through the observer connection. Concurrent completion with
+  another PAID attempt, late FAILED or reconciliation commits successfully without
+  repeat settlement/release. A deliberately prohibited second applied settlement
+  fails its unique index; a mismatched settlement fails deferred validation at
+  COMMIT, while a valid settlement commits. No sleeps or Promise.all-only overlap.
+  Larger transaction timeouts are test-local, not application configuration changes.
+- **Executed checks:** Build, lint and all 5 unit tests passed. Fresh isolated
+  PostgreSQL run passed 38 integration checks. Drizzle metadata check passed;
+  SQL migration hashes are unchanged. Test pilot timezone is Europe/Amsterdam with
+  150 spaces; development remains untouched with zero public tables. Documented
+  that simultaneous local test runs must not share the disposable database.
+- **Scope/time:** README, seed and persistence tests updated, with a dedicated
+  settlement-concurrency test helper. Unrelated Archive.zip left untouched. Codex,
+  Node/TypeScript, PostgreSQL/Docker and shell checks used. Measured elapsed
+  wall-clock time through verification: 403 seconds; excludes this journal/final
+  response. Exact model and tool/token cost unknown. No commit or push.

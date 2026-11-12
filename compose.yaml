@@ -15,5 +15,20 @@ services:
       interval: 2s
       timeout: 2s
       retries: 15
+  postgres-test:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: parkingbusiness_test
+      POSTGRES_PASSWORD: local-test-only
+      POSTGRES_DB: parkingbusiness_test
+    ports:
+      - "127.0.0.1:5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parkingbusiness_test -d parkingbusiness_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
 volumes:
   postgres-data:
