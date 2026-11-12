@@ -1,10 +1,11 @@
-import { Body, Controller, HttpException, Inject, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpException, Inject, Post, Req, SetMetadata, UseGuards } from '@nestjs/common';
 import { canonicalCheckIn, canonicalRequestId } from './check-in.rules.js';
 import { CheckInService, CheckInUnavailable } from './check-in.service.js';
-import { apiError, GateAuthGuard, GateRequest, rawHeaderValues } from './gate-auth.guard.js';
+import { apiError, GateAuthGuard, GateRequest, rawHeaderValues, REQUIRED_GATE_ROLE } from './gate-auth.guard.js';
 import { isTransientDatabaseFailure } from './occupancy.controller.js';
 
 @Controller('check-in')
+@SetMetadata(REQUIRED_GATE_ROLE, 'ENTRANCE')
 @UseGuards(GateAuthGuard)
 export class CheckInController {
   constructor(@Inject(CheckInService) private readonly checkIn: CheckInService) {}

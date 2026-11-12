@@ -1,4 +1,6 @@
 import { DynamicModule, Module } from '@nestjs/common';
+import { CheckOutController } from './check-out.controller.js';
+import { CheckOutService } from './check-out.service.js';
 import { CheckInController } from './check-in.controller.js';
 import { CheckInService } from './check-in.service.js';
 import { GateAuthGuard } from './gate-auth.guard.js';
@@ -11,8 +13,8 @@ export class ParkingModule {
     return {
       module: ParkingModule,
       imports: [runtime],
-      controllers: [OccupancyController, CheckInController],
-      providers: [OccupancyService, CheckInService, GateAuthGuard],
+      controllers: [OccupancyController, CheckInController, CheckOutController],
+      providers: [OccupancyService, CheckInService, CheckOutService, GateAuthGuard],
     };
   }
 }

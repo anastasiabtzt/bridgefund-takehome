@@ -492,3 +492,80 @@ Retrospective entry based on local Git history and development notes.
   Python. Measured elapsed time through verification: 103 seconds; excludes
   this journal/final review. Exact model/tool cost unknown. All prior work preserved;
   no staging, commits, pushes or stash modifications.
+
+## 2026-11-12 — PB-04 check-out implementation
+
+- **Authorization and scope:** The user authorized PB-04 after independent design
+  review, with one explicit parser-precedence clarification. Codex verified clean
+  HEAD 8257353 and the approved PB-04 specification history before editing. Updated
+  only that spec paragraph: Nest transport-level malformed/oversized JSON can return
+  400/413 before guards; valid requests require gate authentication/EXIT permission
+  before business processing. No HTTP pipeline redesign or PB-03 parsing changes.
+- **Billing:** Pure TypeScript calculation uses Date and Intl with explicit
+  Europe/Amsterdam. A private helper brackets/bisects the next local date change;
+  no localized-string parsing, hardcoded UTC offset or fixed-length calendar day.
+  Each nonempty daily segment charges started elapsed hours capped independently,
+  in integer cents. Residents/zero duration are free. Presentation floors whole
+  minutes only after selecting the checkout instant; billing uses unrounded time.
+- **Application decisions:** Minimal endpoint role metadata parameterizes the existing
+  gate guard; check-in remains ENTRANCE and check-out requires EXIT, with explicit
+  200. One READ COMMITTED transaction locks request identity, resolves immutable
+  binding before session lookup, then locks building/session and revalidates state.
+  First valid PARKED checkout samples Clock once, freezes billing, and completes
+  only when free; positive charge retains allocation awaiting payment. Frozen repeats
+  neither sample Clock nor mutate sessions, while every fresh key gets its own
+  terminal outcome. Mismatch is durably replayed; unknown/inaccessible sessions and
+  Clock inconsistency are nonterminal. No payment events or payment endpoint added.
+- **Executed evidence:** Billing tests ran against a throwing stub first: 18 expected
+  failures and one passing rejection test; all 19 then passed after implementation.
+  They also passed independently under TZ=UTC and TZ=Pacific/Auckland, including
+  both specified 2026 DST intervals, 23/25-hour local days, midnight boundaries and
+  exact-hour-plus-1-ms behavior. Final npm run build and npm run lint passed.
+  npm test passed all 32 unit/HTTP tests, including existing PB-03/PB-06 tests.
+  With the guarded local TEST_DATABASE_URL, npm run test:integration passed all
+  67 checks. Separate application/observer connections establish real lock overlap:
+  same/different keys freeze one timestamp, Clock waits for building and session
+  locks, request outcomes commit atomically, and injected outcome failures/statement
+  timeouts roll back state before same-key recovery. Positive checkout retains plate/
+  allocation; free completion enables PB-03 reuse and changes PB-06 occupancy.
+  Critical regression passed: after A completes and B occupies A's former space,
+  new-key checkout of A preserves both sessions and B's allocation. No actual
+  checkout/payment-endpoint race or network-response-loss test is claimed.
+- **Verification and limits:** npm test --prefix simulator passed all 10 tests.
+  npm run audit:dependencies reported 0 blocking findings: 14 existing dev-tool
+  packages remain under existing exceptions requiring review before 2026-11-19;
+  simulator audit is clean. No unexpected test/build/lint failures occurred. Test
+  trigger/functions were removed. Whitespace, final-newline, document-link and scope
+  checks passed; schema, migrations, dependencies, runtime and other specs unchanged.
+  Payment webhooks, exit notifications and physical barrier commands remain deferred.
+  Remote CI was not run; implementation awaits independent review and user approval.
+- **Tools/time:** Codex, Git, TypeScript/ESLint, Node/npm, NestJS, Drizzle/pg,
+  PostgreSQL and Python. Measured elapsed time through verification: 471 seconds,
+  excluding this journal/final review. Exact model and tool/token cost unknown.
+  No staging, commits, pushes, reset/rebase or stash changes.
+
+## 2026-11-12 — PB-04 approved closure and final verification
+
+- **Review/authorization:** The user reported independent architecture review with
+  APPROVE and no BLOCKER or IMPORTANT findings, then explicitly authorized one
+  PB-04 commit after final checks. Optional suggestions were not implemented and
+  approved architecture was not reopened.
+- **Final polish:** Codex inspected the complete implementation/test diff against
+  PB-04. No application or test changes were needed. Corrected README statements
+  that still claimed no endpoints/routes existed, and PB-04's obsolete pending-
+  implementation/test status. Checkout/payment limitations remain explicit; the
+  only behavioral spec clarification remains the approved parser precedence.
+  The prior 471-second implementation measurement is unchanged.
+- **Fresh verification:** npm run build and npm run lint passed. npm test: 32 passed.
+  TEST_DATABASE_URL=postgresql://parkingbusiness_test:local-test-only@127.0.0.1:5433/parkingbusiness_test
+  npm run test:integration: 67 passed, including PB-03/PB-06 regressions and existing
+  persistence checks. npm test --prefix simulator: 10 passed. npm run
+  audit:dependencies: 0 blocking findings; existing exceptions still cover 14
+  dev-tool packages and require review before 2026-11-19; simulator audit clean.
+  git diff --check and document-link/final-newline checks passed. No failures or
+  unrelated changes were found. Remote CI execution is not claimed.
+- **Tools/time:** Codex, Git, Node/npm, TypeScript/ESLint, PostgreSQL and Python.
+  Measured additional closure time through verification: 85 seconds, excluding
+  this entry and staging/commit verification. Exact model/tool cost unknown.
+  Authorized commit scope is PB-04 only; no push, amendment, reset, rebase or stash
+  operation is authorized or performed.

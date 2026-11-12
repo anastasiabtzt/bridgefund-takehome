@@ -1,7 +1,7 @@
 # PB-04: Check-out
 
-Status: approved on 2026-11-12, ready for implementation once this
-specification is committed. Approval does not authorize implementation or a commit.
+Status: approved on 2026-11-12; implementation approved after independent
+architecture review. Commit authorization remains separate.
 Sources: [brief](../BRIEF.md), [gates](../docs/gates.md),
 [architecture](../docs/architecture.md), [PB-03](PB-03-check-in.md).
 
@@ -93,8 +93,11 @@ after validation/resident checks; it never recalculates or releases twice.
 Malformed/unauthorized requests and transient 503/500 failures are not terminal
 idempotency results. Unknown sessions cannot create a building-scoped binding.
 
-Processing order: authenticate the credential and authorize its exit-gate role,
-then validate request structure. Derive building scope from trusted gate configuration.
+NestJS body parsing precedes guards: malformed or oversized JSON may receive
+transport-level 400/413 before authentication. For structurally valid requests,
+authenticate the credential and authorize its exit-gate role before business
+processing, then validate the request fields. Derive building scope from trusted
+gate configuration.
 In the application transaction, acquire the transaction-scoped advisory lock for
 canonical `(building, check-out, X-Request-Id)`, then resolve an existing outcome
 before looking up the supplied session. Key derivation must be deterministic and
@@ -167,6 +170,7 @@ Lifecycle/release, daily tariff segmentation, duration presentation and resident
 mismatch handling are approved. The tariff interpretation is a final developer-selected
 pilot decision despite the conflicting source example. Payment-success delivery to
 exit gates remains unspecified and outside backend scope; this prevents claiming
-end-to-end barrier integration, not backend implementation. Commit this
-specification before implementation.
-No application tests have been executed for this specification.
+end-to-end barrier integration, not backend implementation. The specification
+preceded implementation in Git history. PB-04 tests are implemented; execution
+evidence is recorded in the [journal](../JOURNAL.md). Checkout/payment endpoint
+race tests remain deferred to PB-05.

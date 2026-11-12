@@ -2,8 +2,8 @@
 
 NestJS + TypeScript modular-monolith backend with PostgreSQL and Drizzle.
 The foundation includes startup/configuration, Clock, reviewed SQL migrations,
-deterministic pilot seed, database constraint tests and CI. Business endpoints
-remain unimplemented.
+deterministic pilot seed, database constraint tests and CI. Check-in, check-out
+and public occupancy are implemented; payment webhooks remain deferred.
 
 ## Local setup
 
@@ -19,8 +19,8 @@ npm run dev
 ```
 
 The app binds to `127.0.0.1:3000` by default and checks PostgreSQL before listening.
-An HTTP request receives 404 because no routes are implemented. `Ctrl+C` closes
-the pool. Missing/invalid configuration or unavailable PostgreSQL fails startup
+`GET /occupancy` is public; check-in/check-out require configured gate credentials.
+`Ctrl+C` closes the pool. Missing/invalid configuration or unavailable PostgreSQL fails startup
 with an actionable error without printing the database URL. For production-style
 local startup: `npm run build` then `npm start`.
 
@@ -149,3 +149,25 @@ for retries of one event, including after an uncertain response. Committed succe
 full-capacity and duplicate-plate outcomes replay unchanged. A new physical event
 requires a new UUID. PostgreSQL pool/query/lock timeouts remain configurable above;
 the 1.5-second response target is not an SLA or a strict aggregate deadline.
+
+### Check-out
+
+`POST /check-out` uses an `EXIT` credential from `GATE_CREDENTIALS`, JSON and one
+UUID `X-Request-Id`. Body: `{"parkingSessionId":"<session UUID>","isResident":false}`.
+The resident flag must match the stored session. Successful responses are **200**:
+
+```json
+{"parkingSpaceId":51,"sessionLengthInMinutes":70,"amountDue":{"value":1000,"currency":"EUR"}}
+```
+
+The first valid checkout freezes time, whole-minute duration and integer-cent
+charge. Billing uses started hours per Amsterdam calendar day and that day's cap;
+70 minutes for a visitor car costs 1000 cents. Zero charge completes and releases
+logical allocation; positive charge awaits payment and retains allocation. Repeats
+return the frozen result, including under a new request UUID (which gets its own
+immutable outcome). Reuse one UUID when retrying an uncertain operation.
+
+Malformed/oversized JSON can receive 400/413 before gate authentication. Other
+checkout failures use the [PB-04 error contract](specs/PB-04-check-out.md).
+Checkout 200 is not a barrier command. Payment webhooks and payment-success
+notifications to exit controllers are not implemented by this checkpoint.
