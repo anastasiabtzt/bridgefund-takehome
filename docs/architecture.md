@@ -24,8 +24,8 @@ See [the brief](../BRIEF.md) for the requirements and its pricing contradiction.
 
 The backend scope covers checkout, payment settlement and durable session completion
 in PostgreSQL. It excludes outbound payment initiation, delivery of payment success
-to exit-gate controllers and physical barrier commands. Checkout 200 and webhook
-204 are not barrier-open commands; business endpoints remain to be implemented.
+to exit-gate controllers and physical barrier commands. PB-03 through PB-06
+endpoints are implemented. Checkout 200 and webhook 204 are not barrier-open commands.
 
 ## Architectural decisions
 
@@ -33,9 +33,12 @@ Use NestJS and TypeScript for a REST API, PostgreSQL with Drizzle for persistenc
 and a modular monolith: one application deployment and one database. These are
 chosen implementation decisions, not technologies mandated by the brief.
 
-### Three domain modules
+### Domain responsibilities and application modules
 
-| Module | Responsibilities |
+Parking and Payments are Nest application modules. Billing is calculation/domain
+logic called by Parking checkout, without a separate Nest module.
+
+| Area | Responsibilities |
 | --- | --- |
 | Parking | Allocation, session lifecycle, eligibility policies, plate normalization, gate-request idempotency and public occupancy reads. Owns space exclusivity. |
 | Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. The final developer-selected pilot tariff is documented in PB-04; the contradictory €5.83 source example remains noted, not an approval dependency. |

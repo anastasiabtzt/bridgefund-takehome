@@ -784,3 +784,24 @@ Retrospective entry based on local Git history and development notes.
 - **Checks:** Documentation link, whitespace and diff checks are part of this
   preparation; application tests and the final audit are outside this pass.
   Tools: Codex, Git, shell, Node and Python. Time and model/tool cost unknown.
+
+## 2026-11-13 — Final audit documentation corrections
+
+- **Review and scope:** The user accepted a read-only final audit and authorized
+  only targeted documentation corrections. Static inspection found stale README
+  and architecture statements about unimplemented Billing/endpoints, ambiguous
+  timing wording and a misleading count of Nest domain modules. Source inspection
+  confirmed Parking and Payments application modules and a Billing calculation
+  called by checkout.
+- **Corrections:** README now describes implemented Amsterdam calendar-day billing
+  and distinguishes the vendor's two-second wait from the unmeasured 1.5-second
+  internal target. It states that database waits are individually bounded and no
+  aggregate HTTP deadline is enforced. Architecture now reflects implemented
+  PB-03–PB-06 endpoints and the actual module structure. No application behavior
+  or integration claim changed.
+- **Verification boundary:** The final audit inspected source, specs, tests, CI and
+  history without executing build or database-resetting integration suites. This
+  documentation pass checks links and diff/whitespace only; no latency measurement
+  or load test was performed. Tools: Codex, Git, shell and Python. Time and
+  model/tool cost unknown. No application code, test, migration, dependency,
+  commit or push change.

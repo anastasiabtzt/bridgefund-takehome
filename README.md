@@ -71,7 +71,8 @@ Sessions are the allocation source of truth. Partial unique indexes enforce one
 active plate per building and one active allocation per building/space. Composite
 foreign keys prevent cross-building references. Money uses bigint integer cents
 bounded to JavaScript's safe-integer range. Constraints protect lifecycle shape;
-the future Billing domain will calculate tariffs. Deferred consistency checks let
+the Billing calculation applies started-hour rates and per-Amsterdam-calendar-day
+caps when checkout freezes the charge. Deferred consistency checks let
 one transaction update payment and session in either write order, but reject an
 inconsistent commit. Privileged administrators can bypass guards; normal application
 SQL must not disable them. Constraint triggers add no endpoint or background worker.
@@ -101,10 +102,13 @@ Only `DATABASE_URL` is required; other settings have defaults shown in
 | DB_LOCK_TIMEOUT_MS | 250 | Fail lock waits earlier than the statement limit |
 | DB_IDLE_TRANSACTION_TIMEOUT_MS | 1000 | End abandoned idle transactions |
 
-Lock timeout must be less than statement timeout. These are configurable starting
-values, not proof of the 1.5-second use-case target: later endpoints must enforce
-an end-to-end budget across pool acquisition and multiple statements. Startup may
-need larger connection limits on a remote database. No locking abstraction is added.
+Lock timeout must be less than statement timeout. The gate vendor waits two seconds
+for a response before retrying a request without an answer. The 1.5-second
+use-case target is an internal engineering target, not a vendor requirement or a
+demonstrated SLA. Pool acquisition, statement and lock waits have individual
+bounds, but no aggregate end-to-end HTTP deadline is enforced; no measured latency
+or load-test result is claimed. Startup may need larger connection limits on a
+remote database. No locking abstraction is added.
 
 Package versions are pinned in package.json/package-lock.json. The simulator is
 an independent supplied package; application commands do not install or modify it.
@@ -148,8 +152,8 @@ The body is exactly `vehicleType` (`CAR`/`MOTOR`), `isResident` (boolean) and
 The pilot derives the building from gate configuration. Reuse the same request UUID
 for retries of one event, including after an uncertain response. Committed success,
 full-capacity and duplicate-plate outcomes replay unchanged. A new physical event
-requires a new UUID. PostgreSQL pool/query/lock timeouts remain configurable above;
-the 1.5-second response target is not an SLA or a strict aggregate deadline.
+requires a new UUID. The individually bounded database waits and internal response
+target are described above.
 
 ### Check-out
 
