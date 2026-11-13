@@ -704,3 +704,83 @@ Retrospective entry based on local Git history and development notes.
 - **Tools/limits:** Codex, Git and Python; additional preparation time and exact
   model/tool cost not measured. No push, history rewrite or PB-07 work. Commit
   contents and final working-tree status are verified after creating the checkpoint.
+
+## 2026-11-13 — PB-07 roadmap and Payment Exception Review specification
+
+- **Scope and approval:** The user approved the PB-07 proposal and authorized
+  documentation only: a concise roadmap, one future feature specification and
+  this journal update. Future implementation, commits and pushes were not authorized.
+- **Decision and trade-off:** P0 exit authorization has the highest pilot operational
+  value but needs a gate-vendor contract; the supplied notes do not define a
+  payment-success delivery or barrier-command mechanism. Payment Exception Review
+  was selected as the next specifiable slice: operator-only, read-only visibility
+  of existing `RECONCILIATION_REQUIRED` events, without refund or resolution state.
+  Resident entitlement needs a trusted source; multi-building and dynamic pricing
+  are deferred until real business inputs justify them. See [roadmap](ROADMAP.md)
+  and [specification](specs/PB-07-payment-exception-review.md).
+- **Schema finding:** `payment_events` has an immutable `(provider_id, payment_id)`
+  primary key but no creation timestamp or sequence. The spec uses keyset ordering
+  over that pair. It guarantees stable continuation for pre-existing rows under
+  concurrent inserts, while stating that a scan is not a frozen snapshot and
+  later inserts behind the cursor require a fresh scan. No migration or index was
+  proposed. The initial example named a configurable provider ID; inspecting
+  PB-05's actual constant corrected it to `pilot` before review.
+- **Verification and limits:** Read the brief, integration notes, architecture,
+  PB-03–PB-06 specs, README, schema/migrations, payment implementation and Git
+  history. Documentation/link/scope checks were performed; no application tests,
+  build, dependency audit or remote CI were run for this documentation-only phase.
+  Gate delivery, unsigned legacy terminals and provider-side reconciliation remain
+  external limitations. The draft awaits human review.
+- **Tools/time:** Codex, Git and shell. Elapsed time and model/tool cost unknown.
+  No application code, staging, commit or push.
+
+## 2026-11-13 — PB-07 specification review clarifications
+
+- **Review:** The user approved the roadmap and approved the specification subject
+  to a narrower pagination guarantee and database-collation verification. The
+  specification now limits exactly-once traversal to immutable matching rows
+  committed before page one; it explicitly distinguishes this from a frozen scan.
+- **Evidence and correction:** The development PostgreSQL database had no
+  `payment_events` table, so its catalog could not establish the claim. The
+  isolated PostgreSQL 17 test database did: both columns and both primary-key
+  keys use deterministic `default` collation (`en_US.utf8`) and `text_ops`.
+  Read-only Unicode samples showed tuple comparison agrees with `ORDER BY`;
+  `EXPLAIN` used the existing primary-key index for the keyset condition. No
+  explicit collation, index or schema change was introduced. This evidence and
+  the refined guarantee were added to the [spec](specs/PB-07-payment-exception-review.md).
+- **Scope/tools:** Documentation-only correction using Codex, Git, shell, Docker
+  Compose and PostgreSQL catalog/read-only SQL. Documentation links, final
+  newlines, trailing whitespace and Git diff checks passed. No application tests
+  or code; no staging, commit or push. Time and model/tool cost unknown.
+
+## 2026-11-13 — PB-07 cursor-length review correction
+
+- **Independent finding:** Review identified that the proposed 1024-character
+  cursor limit rejects a server-generated cursor for a valid PB-05 payment ID of
+  128 U+0001 characters. Codex reproduced 811 compact JSON bytes and a 1082-character
+  unpadded base64url token; the original limit was an incorrect assumption.
+- **Correction:** The spec now fixes compact JSON key order and UTF-8/base64url
+  serialization, derives the exact 1082-character maximum from the 43-byte fixed
+  JSON overhead plus at most six bytes per valid ID code point, and sets the input
+  limit to that bound. It adds an end-to-end pagination acceptance case for the
+  maximum control-character ID and keeps malformed/oversized token rejection.
+  PB-05's accepted identifiers and the keyset design are unchanged.
+- **Evidence/scope:** Used Codex, Git, shell and Node to inspect PB-05 validation,
+  reproduce the 1082-character round trip and check every valid Unicode code point;
+  the maximum JSON expansion was six bytes. Documentation links, whitespace and
+  Git diff checks passed. This is documentation only; no PB-07 code,
+  infrastructure, staging, commit or push. Elapsed time and model/tool cost unknown.
+
+## 2026-11-13 — PB-07 documentation commit preparation
+
+- **Authorization:** The user approved the final PB-07 documentation for one scoped
+  commit with message `docs(roadmap): add PB-07 roadmap and payment exception review spec`.
+  This approval does not authorize PB-07 implementation or a push.
+- **Scope and review:** Confirmed that the only working-tree changes are the
+  roadmap, PB-07 specification and this journal. Updated the specification status
+  to reflect commit approval. Reviewed the roadmap against BRIEF.md PB-07 and the
+  future API contract against the approved scope. The cursor maximum remains 811
+  compact JSON bytes / 1082 base64url characters for a valid 128-code-point ID.
+- **Checks:** Documentation link, whitespace and diff checks are part of this
+  preparation; application tests and the final audit are outside this pass.
+  Tools: Codex, Git, shell, Node and Python. Time and model/tool cost unknown.
