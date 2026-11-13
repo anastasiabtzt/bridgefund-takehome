@@ -1,4 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException } from '@nestjs/common';
+import type { IncomingMessage } from 'node:http';
+import { apiError } from './http-utils.js';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 
 @Catch()
@@ -25,6 +27,15 @@ class ApiExceptionFilter implements ExceptionFilter {
 }
 
 export function configureHttp(app: NestExpressApplication): void {
+  // This route-specific check precedes body-parser's inflation/verify stages.
+  app.use('/webhooks/payments', (request: IncomingMessage, _response: unknown, next: (error?: unknown) => void) => {
+    const encoding = request.headers['content-encoding'];
+    if (encoding !== undefined && encoding.toLowerCase() !== 'identity') {
+      next(apiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Compressed payment requests are not supported.'));
+      return;
+    }
+    next();
+  });
   app.useBodyParser('json', { limit: '4kb' });
   app.useGlobalFilters(new ApiExceptionFilter());
 }

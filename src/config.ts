@@ -9,6 +9,7 @@ export interface GateCredential {
 
 export interface AppConfig {
   gates: GateCredential[];
+  webhookSecret?: string;
   databaseUrl: string;
   port: number;
   poolMax: number;
@@ -61,6 +62,7 @@ export function loadConfig(env: Environment = process.env): AppConfig {
 
   const config: AppConfig = {
     databaseUrl,
+    webhookSecret: env.WEBHOOK_SECRET,
     gates: gateCredentials(env.GATE_CREDENTIALS),
     port: integer(env, 'PORT', 3000, 65535),
     poolMax: integer(env, 'DB_POOL_MAX', 5, 100),

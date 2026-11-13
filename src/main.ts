@@ -7,7 +7,7 @@ import { loadConfig } from './config.js';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig();
-  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(config), { abortOnError: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(config), { abortOnError: false, rawBody: true });
   configureHttp(app);
   app.enableShutdownHooks();
   try {

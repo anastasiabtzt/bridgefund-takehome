@@ -1,22 +1,13 @@
-import { CanActivate, ExecutionContext, HttpException, Inject, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage } from 'node:http';
+import { apiError, rawHeaderValues } from '../http-utils.js';
 import { APP_CONFIG, AppConfig, GateCredential } from '../config.js';
 
 export const REQUIRED_GATE_ROLE = 'parking:gate-role';
 
 export interface GateRequest extends IncomingMessage { gate: GateCredential }
-export function apiError(status: number, code: string, message: string): HttpException {
-  return new HttpException({ error: { code, message } }, status);
-}
-export function rawHeaderValues(request: IncomingMessage, name: string): string[] {
-  const values: string[] = [];
-  for (let i = 0; i < request.rawHeaders.length; i += 2) {
-    if (request.rawHeaders[i].toLowerCase() === name) values.push(request.rawHeaders[i + 1]);
-  }
-  return values;
-}
 
 @Injectable()
 export class GateAuthGuard implements CanActivate {

@@ -2,8 +2,8 @@
 
 NestJS + TypeScript modular-monolith backend with PostgreSQL and Drizzle.
 The foundation includes startup/configuration, Clock, reviewed SQL migrations,
-deterministic pilot seed, database constraint tests and CI. Check-in, check-out
-and public occupancy are implemented; payment webhooks remain deferred.
+deterministic pilot seed, database constraint tests and CI. Check-in, check-out,
+payment confirmations and public occupancy are implemented.
 
 ## Local setup
 
@@ -33,7 +33,8 @@ npm run audit:dependencies
 npm run db:down
 ```
 
-Install the independent simulator with `npm ci --prefix simulator --ignore-scripts`.
+Install the independent simulator with `npm ci --prefix simulator --ignore-scripts`
+before integration tests: payment integration tests launch its actual HTTP sender.
 Compose runs development PostgreSQL on port 5432 with a persistent volume, and a
 separate disposable test server on port 5433 with tmpfs data. Both bind loopback.
 Credentials are public local-only defaults; real `.env` files are ignored.
@@ -169,5 +170,44 @@ immutable outcome). Reuse one UUID when retrying an uncertain operation.
 
 Malformed/oversized JSON can receive 400/413 before gate authentication. Other
 checkout failures use the [PB-04 error contract](specs/PB-04-check-out.md).
-Checkout 200 is not a barrier command. Payment webhooks and payment-success
-notifications to exit controllers are not implemented by this checkpoint.
+Checkout 200 is not a barrier command. Payment webhooks settle backend sessions;
+payment-success notifications to exit controllers remain outside the backend scope.
+
+### Payment confirmations
+
+`POST /webhooks/payments` requires JSON and exactly one lowercase-hex `X-Signature`:
+HMAC-SHA256 over the exact body bytes using `WEBHOOK_SECRET`. Set the provider-shared
+secret in local/deployment configuration; do not commit it. An unset/empty secret
+fails authentication closed. Nest retains the raw body under the existing 4 KiB
+limit. Non-identity Content-Encoding (including gzip) is rejected with 415 before
+decompression on the payment route. Gate credentials and `X-Legacy-Exit` do not
+authenticate provider calls.
+Unsigned legacy terminals remain unsupported by the approved security policy.
+
+Use the [PB-05 payload/error contract](specs/PB-05-payment-confirmation.md).
+Accepted events return an empty **204 after commit**. Events bind immutable
+`(pilot provider, paymentId)` identities throughout the pilot; conflicting reuse
+returns 409 PAYMENT_ID_REUSED. Payment IDs preserve valid Unicode exactly (at most
+128 code points); NUL and unpaired surrogates are rejected before database work. Only exact EUR PAID settlement of the frozen charge
+completes an awaiting-payment session and releases logical allocation. FAILED
+records its original amount/currency without settling, even when they mismatch.
+A distinct PAID after completion is recorded for reconciliation, without another
+settlement/release or an assumption that a duplicate charge occurred.
+
+PAID/FAILED before checkout return uncached 409 CHECKOUT_REQUIRED. The same event
+can redeliver after checkout, but the provider's 24-hour retry window does not
+guarantee recovery. Transient database errors return 503 without an accepted binding.
+Webhook 204 is not a barrier command or a payment-success message delivered to a gate.
+Unexpected processing failures emit one sanitized diagnostic containing operation, a
+generated correlation UUID, classification and SQLSTATE when available. Payment IDs,
+session IDs, bodies, signatures, secrets, SQL parameters and raw messages are omitted.
+
+The existing [simulator](simulator/README.md) can call the running backend:
+
+```sh
+WEBHOOK_SECRET='<same provider secret>' node simulator/send-webhook.mjs --session <session-uuid> --amount 1000
+```
+
+Use the frozen checkout amount and keep the signing secret identical on both sides.
+The simulator's legacy scenario should receive 401. Payment initiation, refunds,
+notification delivery and physical barrier control are not implemented.

@@ -569,3 +569,138 @@ Retrospective entry based on local Git history and development notes.
   this entry and staging/commit verification. Exact model/tool cost unknown.
   Authorized commit scope is PB-04 only; no push, amendment, reset, rebase or stash
   operation is authorized or performed.
+
+## 2026-11-13 — PB-05 payment confirmation implementation
+
+- **Approval/scope:** The user approved the plan and explicitly limited Parking's
+  settlement provider to lookup, locking and completion in the caller's transaction.
+  Codex verified clean HEAD e22fbe2, committed PB-05 history (69f7990/6aadeb2), and
+  approval evidence before implementation. Specifications and database model remain
+  unchanged. This implementation is pending independent review, not self-approved.
+- **Security/integration:** Added Payments with Nest raw-body capture under the
+  existing 4 KiB parser. HMAC-SHA256 compares exact retained Buffer bytes using
+  constant-time comparison; one lowercase-hex signature is required. Missing/empty
+  configured secret, missing raw-body capture and unsigned legacy requests fail
+  closed. No signature reconstruction from JSON, credential fallback or logging of
+  secrets/raw payment bodies. The trusted pilot provider identity is fixed server-
+  side. Runtime and Parking are configured once and reused; tests prove one database
+  provider/pool per Nest application. No dependencies or new infrastructure.
+- **Transactions/policies:** Payment identity advisory locking uses namespace 2,
+  separate from gate namespace 1. Accepted immutable bindings are resolved before
+  session lookup. Parking identifies the building, then locks building/session and
+  returns authoritative state in the payment use case's READ COMMITTED transaction.
+  Exact EUR PAID settles and completes atomically; only this validated path samples
+  Clock, after locking immediately before completion. Duplicate, FAILED, pre-checkout
+  rejection and reconciliation paths do not sample Clock. FAILED records original
+  mismatched amounts/currencies without settlement; distinct PAID after completion
+  records reconciliation without modifying session/allocation or asserting a second
+  charge. Early CHECKOUT_REQUIRED and infrastructure errors remain unbound. Existing
+  deferred constraints validate the final settlement/completion together at COMMIT.
+- **Executed verification:** Signature and validation tests first produced two expected
+  failures against stubs, then passed. npm run build and npm run lint passed. Final
+  npm test: 36 passed. With the existing guarded local TEST_DATABASE_URL,
+  npm run test:integration: 85 passed, including PB-03/PB-04/PB-06 regressions, schema
+  constraints and DI tests. Controlled separate connections/two application instances
+  cover duplicate/conflicting IDs, concurrent PAIDs/late FAILED/reconciliation,
+  checkout/payment overlap, session-lock Clock timing, rollback and bounded lock/
+  statement-timeout recovery. No sleep-based overlap assertions. Later occupants are
+  preserved when old sessions receive reconciliation. The actual simulator sender
+  received signed 204 and unsigned legacy 401 against the backend. npm test --prefix
+  simulator: 10 passed. npm run audit:dependencies: 0 blocking findings; the same
+  14 dev-tool packages remain covered by existing exceptions requiring review before
+  2026-11-19; simulator audit clean. Whitespace, links, newlines and scope checks pass.
+- **Mistakes/corrections:** The duplicate-signature HTTP fixture initially returned
+  transport 400 instead of expected 401 because its raw request lacked explicit Host/
+  body-length framing. Corrected the fixture; signature rejection now reaches the
+  guard. PostgreSQL then rejected a new fixture's state parameter (42P08: enum/text
+  inference); an explicit session_state cast corrected it. Existing feature tests
+  passed during those runs. No production policy was changed to accommodate tests.
+- **Limits/next review:** Provider retries before checkout still have the approved
+  24-hour recovery limitation; unsigned legacy terminals remain unsupported. No
+  refund workflow, payment initiation, queue, exit notification or physical barrier
+  integration is claimed. Temporary test fault-injection functions/triggers were
+  removed. Remote CI and network-response-loss injection were not run. README/env
+  examples document secret setup, 204 semantics and simulator prerequisites. PB-07
+  was not started. Nothing staged, committed, pushed or stashed.
+- **Tools/time:** Codex, Git, Node/npm, NestJS, Drizzle/pg, PostgreSQL, TypeScript/
+  ESLint and Python. Measured elapsed time through verification: 677 seconds,
+  excluding this journal/final review. Exact model and tool/token cost unknown.
+
+## 2026-11-13 — PB-05 review: security, diagnostics and deterministic race coverage
+
+- **Review/traceability:** The user supplied three IMPORTANT defects and two OPTIONAL
+  improvements, authorizing targeted corrections without commits. Codex recorded
+  compression and lossless-identifier security clarifications in PB-05 before code
+  changes in this pass; existing settlement, retry/reconciliation policies and
+  constraints were preserved. The reviewed baseline spec already predates initial
+  implementation; no clarification commit was created against the no-commit instruction.
+- **Compression FIXED:** Inspection of installed body-parser read.js and Nest's
+  raw-body verify hook confirmed inflation precedes verification. Added only a
+  webhook-mounted Content-Encoding check before the existing parser: non-identity
+  encodings return safe 415 without decompression. HTTP tests cover gzip signed over
+  compressed and decompressed bytes, malformed gzip and a compressed oversized body.
+  Identity JSON keeps the 4 KiB limit; compressed check-in still follows its unchanged
+  parser behavior. No parser replacement, dependencies or transport redesign.
+- **Unicode FIXED:** Validation rejects NUL and either unpaired-surrogate direction
+  before payment service invocation. A failing regression test first demonstrated
+  the missing rejection, then passed. Valid supplementary characters and distinct
+  composed/decomposed spellings are preserved without normalization/replacement.
+  PostgreSQL tests observe zero application-pool acquisitions for invalid IDs and
+  verify exact advisory identity, persisted UTF-8 bytes and replay for valid IDs,
+  including the 128-code-point boundary.
+- **Diagnostic FIXED:** Unexpected payment processing failures emit exactly one
+  structured record: operation, newly generated UUID, safe classification and a
+  validated PostgreSQL SQLSTATE when available. No raw message, stack, query/params,
+  payment/session ID, body, signature or secret is logged. Tests spy on logger calls,
+  enforce the exact field allowlist and single emission, unique generated IDs and
+  sensitive-data exclusion. Expected business/validation and transient failures do
+  not produce these unexpected-failure diagnostics; HTTP envelopes remain sanitized.
+- **Test improvement FIXED:** Checkout/payment races now reserve identified backend
+  connections and prove first/second tuple-lock queue order using pg_blocking_pids.
+  Both checkout-first and payment-first results are asserted, with unchanged-event
+  recovery after uncached CHECKOUT_REQUIRED. Payment concurrency helpers no longer
+  rely on global waiter counts. A real PB-03 HTTP arrival reuses the paid space and
+  plate; old-session payment replay/reconciliation and checkout preserve its new
+  occupant and PB-06 occupancy. No sleeps or production transaction hooks added.
+- **Coupling cleanup FIXED:** Moved genuinely shared HTTP error/header helpers, UUID
+  parsing and the unchanged transient classifier into neutral utility files. Payments
+  no longer imports Parking controllers/HTTP guards. Its deliberate Parking dependency
+  is the narrow session-settlement provider operating in the caller's transaction;
+  no generic lifecycle/repository framework or broad module restructuring.
+- **Actual checks/correction:** Focused payment tests: 6 passed. npm run build and
+  npm run lint passed. npm test: 38 passed. With the isolated TEST_DATABASE_URL,
+  npm run test:integration: 88 passed, including PB-03/PB-04/PB-06, constraints and
+  simulator/backend coverage. npm test --prefix simulator: 10 passed. npm run
+  audit:dependencies: 0 blocking findings; unchanged 14 dev-tool packages remain
+  covered by existing exceptions due for review before 2026-11-19; simulator clean.
+  One test compile failed (TS7022 on an inferred diagnostic-count variable); adding
+  its number annotation fixed it. Final suites have no failures. Whitespace, links,
+  final newlines and scope checks passed. Transaction/settlement code, schema,
+  migrations, dependencies and unrelated work are unchanged. No remote CI claimed.
+- **Tools/time/limits:** Codex, Git, shell/Python, Node test/fetch, TypeScript/ESLint,
+  NestJS, PostgreSQL and installed parser source inspection. Measured additional time
+  through verification: 654 seconds; excludes this entry/final review. Model/tool
+  cost unknown. Approved legacy-terminal, gate-notification and 24-hour redelivery
+  limitations remain. Ready for independent review, not self-approved. No staging,
+  commit, push, stash operation or PB-07 work.
+
+## 2026-11-13 — PB-05 approval and commit preparation
+
+- **Approval:** The user confirmed PB-05 approval and independent verification of
+  all five review findings, then explicitly authorized one scoped implementation
+  commit. Historical implementation/review entries and measured times are retained.
+- **Preparation:** Codex inspected the full intended scope, README and journal.
+  The approved baseline PB-05 specification in 69f7990 precedes implementation;
+  subsequent security clarifications were explicitly authorized and reviewed with
+  the fixes. No new business policy, schema or dependency change is included.
+- **Evidence:** Latest completed verification remains 6 focused payment tests,
+  38 unit/HTTP tests, 88 PostgreSQL checks and 10 simulator tests, plus passing
+  build/lint and audit with 0 blocking findings under existing exceptions. Suites
+  were not rerun for this commit-preparation pass. Fresh whitespace, document-link,
+  file-scope, artifact and credential-hygiene checks passed. Only public local-only
+  example database credentials and explicitly synthetic test secrets are present;
+  the example webhook secret is empty. No real environment files or generated/
+  temporary artifacts enter the commit. Remote CI execution is not claimed.
+- **Tools/limits:** Codex, Git and Python; additional preparation time and exact
+  model/tool cost not measured. No push, history rewrite or PB-07 work. Commit
+  contents and final working-tree status are verified after creating the checkpoint.

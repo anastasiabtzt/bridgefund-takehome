@@ -28,6 +28,9 @@ requires an exact EUR match. Preserve original amount, currency and status.
 lowercase hex HMAC-SHA256 over the exact raw body with the configured shared secret.
 Validate its format and compare securely; JSON reserialization is not signature
 input. Verify signatures before business effects or replay. Keep secrets out of logs.
+Reject non-identity Content-Encoding with 415 UNSUPPORTED_MEDIA_TYPE before
+decompression on this webhook route; do not authenticate an inflated representation
+as the original request bytes. Uncompressed JSON retains the 4 KiB limit.
 
 ```json
 {
@@ -39,7 +42,10 @@ input. Verify signatures before business effects or replay. Keep secrets out of 
 ```
 
 Approved pilot validation: exact documented fields; valid session UUID; nonempty payment
-ID up to 128 characters; safe nonnegative integer amount; three-uppercase-letter
+ID up to 128 Unicode code points, excluding NUL and unpaired high/low surrogates;
+reject those invalid identifiers with 400 before opening a transaction. Preserve
+valid Unicode exactly, without normalization or replacement, for locking, storage
+and replay. Other fields: safe nonnegative integer amount; three-uppercase-letter
 currency string (only EUR is supported for settlement) and exact status enum;
 no coercion; 4 KiB body limit. Respond `204 No Content` after durable acceptance,
 including exact duplicates already accepted. This acknowledges processing, not a

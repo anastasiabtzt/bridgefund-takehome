@@ -5,7 +5,8 @@ import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { mapSpace } from '../src/parking/occupancy.service.js';
 import { OccupancyService } from '../src/parking/occupancy.service.js';
-import { OccupancyController, isTransientDatabaseFailure } from '../src/parking/occupancy.controller.js';
+import { OccupancyController } from '../src/parking/occupancy.controller.js';
+import { isTransientDatabaseFailure } from '../src/database/errors.js';
 
 @Module({})
 class TestModule {}

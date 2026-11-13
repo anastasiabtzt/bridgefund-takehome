@@ -17,10 +17,7 @@ export function canonicalCheckIn(value: unknown): CheckInPayload {
   return { vehicleType: body.vehicleType as 'CAR' | 'MOTOR', isResident: body.isResident, normalizedLicensePlate: plate };
 }
 
-export function canonicalRequestId(value: string): string {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) throw new Error('Invalid request ID.');
-  return value.toLowerCase();
-}
+export { canonicalUuid as canonicalRequestId } from '../uuid.js';
 
 export function eligibleRange(payload: CheckInPayload): [number, number] {
   return payload.isResident ? [1, 50] : payload.vehicleType === 'CAR' ? [51, 130] : [131, 150];

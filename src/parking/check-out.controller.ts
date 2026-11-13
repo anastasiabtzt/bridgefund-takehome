@@ -2,8 +2,9 @@ import { Body, Controller, HttpCode, HttpException, Inject, Post, Req, SetMetada
 import { canonicalRequestId } from './check-in.rules.js';
 import { canonicalCheckOut } from './check-out.rules.js';
 import { CheckOutService, CheckOutUnavailable, ClockInconsistency } from './check-out.service.js';
-import { apiError, GateAuthGuard, GateRequest, rawHeaderValues, REQUIRED_GATE_ROLE } from './gate-auth.guard.js';
-import { isTransientDatabaseFailure } from './occupancy.controller.js';
+import { GateAuthGuard, GateRequest, REQUIRED_GATE_ROLE } from './gate-auth.guard.js';
+import { isTransientDatabaseFailure } from '../database/errors.js';
+import { apiError, rawHeaderValues } from '../http-utils.js';
 
 @Controller('check-out')
 @SetMetadata(REQUIRED_GATE_ROLE, 'EXIT')
