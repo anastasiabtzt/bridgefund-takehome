@@ -805,3 +805,61 @@ Retrospective entry based on local Git history and development notes.
   or load test was performed. Tools: Codex, Git, shell and Python. Time and
   model/tool cost unknown. No application code, test, migration, dependency,
   commit or push change.
+
+## 2026-11-14 — Final submission review corrections and verification
+
+- **Independent review and checkpoint:** The user relayed a read-only review,
+  independent of Codex's work in this pass, with original verdict REQUEST CHANGES:
+  zero BLOCKERS, IMPORTANT F1 and OPTIONAL documentation finding F2. The user
+  authorized only targeted correction/verification, not final approval or a commit.
+  Codex inspected the repository and applied the changes below; human approval of
+  this final working diff remains pending. Historical journal entries are preserved.
+- **F1 correction:** Occupancy previously let Drizzle acquire a pool connection
+  implicitly, so pg-pool's code-less acquisition timeout became HTTP 500. Occupancy
+  now explicitly acquires/releases its connection, matching the other use cases.
+  Only the two exact known pg-pool messages at that acquisition boundary become
+  OccupancyUnavailable and sanitized 503 OCCUPANCY_TEMPORARILY_UNAVAILABLE. The
+  shared transient classifier is unchanged; unexpected query/mapping errors and
+  arbitrary timeout messages retain 500. The single-statement snapshot query and
+  all parking/payment business rules and constraints are unchanged.
+- **Regression evidence:** Added a deterministic real PostgreSQL HTTP test that holds
+  the app's only pool connection, checks exact sanitized 503 and an empty waiter
+  queue, releases it, then checks 200 with 150 spaces/no-store and a usable pool.
+  It first reproduced the reported 500-versus-503 defect (the failed child also
+  marks its parent failed), then passed after the fix. Existing HTTP tests also
+  verify generic timeout messages, including the acquisition text outside the
+  acquisition boundary, stay 500. No sleeps or new dependencies.
+- **F2 documentation:** PB-03/PB-06 status wording now distinguishes original planned
+  checks from committed implementation and points to actual journal evidence;
+  decisions, acceptance criteria and spec-first ancestry remain intact. Moved the
+  existing simulator-install prerequisite before the verification commands in
+  README. ARCHITECTURE_DEFENSE.md was already untracked and remains byte-for-byte
+  untouched; it is not part of this change set.
+- **Database safety:** Before any reset/migration/test, inspected Compose's existing
+  postgres-test container: loopback host port 5433, tmpfs-backed PostgreSQL 17.
+  No .env or process test URL was set. Used the explicitly configured test URL from
+  .env.example; the existing guard and a read-only live check confirmed database
+  and role parkingbusiness_test on 127.0.0.1:5433 (container port 5432). Development
+  data was never connected to or reset. Tests retain their live-identity guard.
+- **Executed commands/results:** npm run build and npm run lint passed.
+  ./node_modules/.bin/tsc --noEmit -p tsconfig.test.json passed (sources and tests).
+  ./node_modules/.bin/tsc -p tsconfig.test.json compiled the focused regressions;
+  node --env-file=.env.example --test .test-dist/test/occupancy.integration.test.js
+  passed 2 tests after correction; node --test .test-dist/test/occupancy.test.js
+  passed 3. Full npm test passed 38 unit/HTTP tests. The exact integration command
+  was TEST_DATABASE_URL=postgresql://parkingbusiness_test:local-test-only@127.0.0.1:5433/parkingbusiness_test npm run test:integration;
+  all 89 PostgreSQL checks passed. npm test --prefix simulator passed 10 tests.
+  npm run audit:dependencies reported 13 root packages, 0 blocking findings under
+  existing dev-tool exceptions, and 0 simulator findings. git diff --check,
+  document-link, final-newline, protected-file and scope checks passed.
+- **Warnings/limits:** Expected missing-.env notices appeared because the test URL
+  was supplied explicitly. Audit exceptions still require review before 2026-11-19;
+  no dependency changes or forced upgrades were made. No unexpected final failures.
+  Remote CI/new independent approval is not claimed. Previously documented unsigned
+  legacy-terminal, exit-gate notification and pre-checkout redelivery limitations
+  remain unchanged. No new features, architecture rewrite or optional bonuses.
+- **AI/tools/time:** Codex performed inspection, correction and verification with
+  Git, Node/npm, NestJS, Drizzle/pg, PostgreSQL/Docker inspection, TypeScript/ESLint
+  and Python. Measured wall-clock through verification: 346 seconds, excluding
+  this journal/final handoff. Exact model, token usage and tool cost unknown.
+  Nothing staged, committed, pushed or stashed.

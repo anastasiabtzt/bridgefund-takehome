@@ -1,7 +1,7 @@
 # PB-06: Public occupancy
 
-Status: approved on 2026-11-12, ready for implementation once this
-specification is committed. Approval does not authorize implementation or a commit.
+Status: approved on 2026-11-12; implemented in `20fa83f` after the specification
+was committed. See the [journal](../JOURNAL.md) for subsequent verification.
 Sources: [brief](../BRIEF.md), [architecture](../docs/architecture.md),
 [PB-03](PB-03-check-in.md), approved [shared lifecycle](PB-04-check-out.md#shared-lifecycle).
 
@@ -64,4 +64,5 @@ for transient database failure, 500 INTERNAL_ERROR without internal details.
 The shared lifecycle/release point and public logical occupancy contract are
 approved. Gate payment notification and physical departure detection are
 outside this public API; the former remains an external integration question.
-Commit this specification before implementation. No tests have been executed.
+This specification preceded implementation in Git history. Tests are implemented;
+the [journal](../JOURNAL.md) records actual executions and results.

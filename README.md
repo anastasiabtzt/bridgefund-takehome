@@ -24,6 +24,9 @@ The app binds to `127.0.0.1:3000` by default and checks PostgreSQL before listen
 with an actionable error without printing the database URL. For production-style
 local startup: `npm run build` then `npm start`.
 
+Install the independent simulator with `npm ci --prefix simulator --ignore-scripts`
+before integration tests: payment integration tests launch its actual HTTP sender.
+
 ```sh
 npm run lint
 npm test
@@ -33,8 +36,6 @@ npm run audit:dependencies
 npm run db:down
 ```
 
-Install the independent simulator with `npm ci --prefix simulator --ignore-scripts`
-before integration tests: payment integration tests launch its actual HTTP sender.
 Compose runs development PostgreSQL on port 5432 with a persistent volume, and a
 separate disposable test server on port 5433 with tmpfs data. Both bind loopback.
 Credentials are public local-only defaults; real `.env` files are ignored.

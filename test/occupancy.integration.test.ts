@@ -6,12 +6,13 @@ import type { PoolClient } from 'pg';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module.js';
 import { loadConfig } from '../src/config.js';
+import { DatabaseService } from '../src/database/database.service.js';
 import { migrateDatabase } from '../src/database/migrate.js';
 import { seedPilot } from '../src/database/seed.js';
 import type { OccupancySpace } from '../src/parking/occupancy.service.js';
 import { openTestDatabase, testDatabaseUrl } from './support/test-database.js';
 
-test('public occupancy reads committed PostgreSQL snapshots without allocation locks', async () => {
+test('public occupancy reads committed PostgreSQL snapshots without allocation locks', async (t) => {
   const database = await openTestDatabase();
   const app = await NestFactory.create(AppModule.register(loadConfig({ ...process.env, DATABASE_URL: testDatabaseUrl() })), { logger: false });
   let writer: PoolClient | undefined;
@@ -78,6 +79,30 @@ test('public occupancy reads committed PostgreSQL snapshots without allocation l
     await writer.query('rollback');
     assert.equal((await read())[130].isOccupied, false, 'rolled-back allocation stays invisible');
     assert.doesNotMatch(JSON.stringify(after), /PRIVATE|building|session|payment|plate|floor/i);
+    await t.test('exhausted occupancy pool returns sanitized 503 and recovers after connection release', async () => {
+      const limited = await NestFactory.create(AppModule.register(loadConfig({ ...process.env,
+        DATABASE_URL: testDatabaseUrl(), DB_POOL_MAX: '1', DB_CONNECTION_TIMEOUT_MS: '250',
+      })), { logger: false });
+      try {
+        await limited.listen(0, '127.0.0.1');
+        const pool = limited.get(DatabaseService).pool;
+        const held = await pool.connect();
+        const url = `${await limited.getUrl()}/occupancy`;
+        try {
+          assert.equal(pool.totalCount, 1); assert.equal(pool.idleCount, 0, 'sole application connection is checked out');
+          const unavailable = await fetch(url);
+          assert.equal(unavailable.status, 503);
+          assert.deepEqual(await unavailable.json(), { error: {
+            code: 'OCCUPANCY_TEMPORARILY_UNAVAILABLE', message: 'Occupancy is temporarily unavailable.',
+          } });
+          assert.equal(pool.waitingCount, 0, 'timed-out acquisition leaves no queued waiter');
+        } finally { held.release(); }
+        const recovered = await fetch(url);
+        assert.equal(recovered.status, 200); assert.equal(recovered.headers.get('cache-control'), 'no-store');
+        assert.equal((await recovered.json()).length, 150);
+        assert.equal(pool.totalCount, 1); assert.equal(pool.waitingCount, 0);
+      } finally { await limited.close(); }
+    });
   } finally {
     if (writer) { await writer.query('rollback'); writer.release(); }
     await app.close();

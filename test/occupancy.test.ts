@@ -64,6 +64,8 @@ test('HTTP public contract, query validation and sanitized error responses', asy
       [new Error('SQL secret plate', { cause: { code: 'ECONNRESET' } }), 503, 'OCCUPANCY_TEMPORARILY_UNAVAILABLE'],
       [{ code: '42P01', message: 'private SQL' }, 500, 'INTERNAL_ERROR'],
       [new TypeError('private mapping data'), 500, 'INTERNAL_ERROR'],
+      [new Error('unexpected query timeout'), 500, 'INTERNAL_ERROR'],
+      [new Error('timeout exceeded when trying to connect'), 500, 'INTERNAL_ERROR'],
     ] as const) {
       error = failure;
       const result = await fetch(url);

@@ -1,7 +1,8 @@
 # PB-03: Check-in
 
 Status: approved; terminal-full revision committed as `7198639` on 2026-11-12.
-Ready for implementation when separately authorized.
+Implemented in `8257353` after the approved specification commits. See the
+[journal](../JOURNAL.md) for subsequent review and verification evidence.
 
 ## Scope and sources
 
@@ -232,7 +233,8 @@ does not establish safe physical barrier behavior.
 Critical race, locking, rollback and constraint tests must use real PostgreSQL,
 separate connections and coordinated overlap, not mocks or a shared rollback-only
 test transaction. Unit tests cover normalization/eligibility; HTTP tests cover
-the full contract. No tests have been implemented or run for this specification.
+the full contract. At specification approval, these were planned acceptance checks.
+See the [journal](../JOURNAL.md) for implementation and checks actually executed.
 
 ## Questions requiring review
 

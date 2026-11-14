@@ -1,6 +1,6 @@
 import { Controller, Get, Header, HttpException, Inject, Query } from '@nestjs/common';
 import { isTransientDatabaseFailure } from '../database/errors.js';
-import { OccupancyService } from './occupancy.service.js';
+import { OccupancyService, OccupancyUnavailable } from './occupancy.service.js';
 
 function failure(status: number, code: string, message: string): HttpException {
   return new HttpException({ error: { code, message } }, status);
@@ -17,7 +17,7 @@ export class OccupancyController {
     try {
       return await this.occupancy.read();
     } catch (error) {
-      if (isTransientDatabaseFailure(error)) {
+      if (error instanceof OccupancyUnavailable || isTransientDatabaseFailure(error)) {
         throw failure(503, 'OCCUPANCY_TEMPORARILY_UNAVAILABLE', 'Occupancy is temporarily unavailable.');
       }
       throw failure(500, 'INTERNAL_ERROR', 'An unexpected error occurred.');
