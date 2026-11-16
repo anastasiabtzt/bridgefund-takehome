@@ -117,15 +117,13 @@ Build uses TypeScript directly, development uses tsx with Node's watcher, and
 Node's test runner avoids another test framework. Installs disable lifecycle scripts;
 the platform-specific esbuild package used by tsx works without running them.
 
-Current dependency audit: production dependencies have no reported vulnerabilities;
-the lint toolchain has a moderate minimatch advisory and Drizzle Kit's transitive
-esbuild loader has a moderate development-server advisory. `npm run audit:dependencies`
-runs native npm audits for both lockfiles. Only GHSA-g3hv-75wg-m249 and
-GHSA-67mh-4wv8-2f99 are deferred for dev-only paths until review before 2026-11-19:
-lint uses fixed local globs, and esbuild serve/Drizzle Studio is not exposed. New
-advisories, runtime findings, failed audit requests and expired exceptions fail CI.
-No forced upgrades or global severity suppression. The simulator's Axios was
-updated to a stable audited version; its signed HTTP transport is tested locally.
+Dependency auditing runs native npm audits for both lockfiles and fails on every
+reported vulnerability or failed audit request, with no exceptions or expiry dates.
+ESLint 10.15.0 and narrowly scoped overrides use minimatch 11.0.5 under
+typescript-estree and esbuild 0.25.12 under core-utils to address the former
+development-only advisories. The overrides cross upstream dependency ranges;
+keep them reviewed when updating those tools. No forced upgrades or severity
+suppression is used. The simulator's signed HTTP transport is tested locally.
 
 GitHub Actions uses PostgreSQL 17 and runs lockfile installs, build, lint (including
 simulator), unit/integration tests, simulator tests and the scoped dependency audit.

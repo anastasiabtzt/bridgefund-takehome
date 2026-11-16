@@ -41,7 +41,7 @@ logic called by Parking checkout, without a separate Nest module.
 | Area | Responsibilities |
 | --- | --- |
 | Parking | Allocation, session lifecycle, eligibility policies, plate normalization, gate-request idempotency and public occupancy reads. Owns space exclusivity. |
-| Billing | Deterministic duration, tariff and rounding calculations, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. The final developer-selected pilot tariff is documented in PB-04; the contradictory €5.83 source example remains noted, not an approval dependency. |
+| Billing | Deterministic charge calculations, tariff and rounding, including Amsterdam calendar-day boundaries. Does not own session transitions or payments. The final developer-selected pilot tariff is documented in PB-04; the contradictory €5.83 source example remains noted, not an approval dependency. |
 | Payments | Payment-attempt identity, duplicate/conflicting confirmations and payment-state rules. A late failed attempt must not undo a different successful payment. |
 
 Keep allocation and sessions together because their invariants are tightly coupled.
@@ -54,8 +54,9 @@ building. Do not implement multi-building management or tariff administration no
 
 ### Domain, application and infrastructure
 
-- **Domain:** explicit business invariants, policies and valid transitions in plain
-  TypeScript, independent of NestJS, HTTP and Drizzle.
+- **Domain:** pure billing and validation policies use plain TypeScript. Transactional
+  lifecycle checks remain in concrete application services alongside explicit
+  Drizzle persistence. Checkout computes presentation duration separately from billing.
 - **Application:** coordinate use cases and module interactions, obtain time,
   invoke domain behavior and own transaction boundaries.
 - **Infrastructure:** REST controllers, caller authentication, raw-body signature

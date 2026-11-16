@@ -863,3 +863,52 @@ Retrospective entry based on local Git history and development notes.
   and Python. Measured wall-clock through verification: 346 seconds, excluding
   this journal/final handoff. Exact model, token usage and tool cost unknown.
   Nothing staged, committed, pushed or stashed.
+
+## 2026-11-16 — Isolated pre-submission audit remediation experiment
+
+- **Authorization/scope:** The user approved an isolated remediation experiment,
+  not a merge or push. Codex used the feature-workflow review/verification stages
+  on `feat/audit-remediation` in `/tmp/bridgefund-audit-remediation`, based on
+  `4cf47aa`. Main and its untracked ARCHITECTURE_DEFENSE.md were left untouched.
+- **Changes/decision:** ESLint 10.14.0 → 10.15.0; scoped overrides select minimatch
+  11.0.5 under typescript-estree and esbuild 0.25.12 under core-utils. Native
+  `npm audit --json` reported zero findings before removing the two exceptions
+  (GHSA-g3hv-75wg-m249 and GHSA-67mh-4wv8-2f99). No forced fixes, downgrade,
+  prerelease, runtime dependency, schema or business-code change. The resolved
+  changes are confined to those development chains and their required dependencies.
+  Audit now rejects every reported vulnerability, including former exceptions and
+  all severities, with no review deadline. Tests retain missing/error-report checks.
+- **Actual setup/corrections:** Initial `npm install --package-lock-only
+  --ignore-scripts --no-audit` used shell Node 23 and emitted engine warnings.
+  Repeated with PATH prefixed by `/opt/homebrew/opt/node@24/bin` (Node 24.22.0,
+  npm 11.19.1), then clean `npm ci --ignore-scripts --no-audit` and
+  `npm ci --prefix simulator --ignore-scripts --no-audit` passed. npm still warns
+  that esm-loader/core-utils are deprecated in favor of tsx; they were not replaced.
+- **Verification executed:** `npm ls eslint minimatch esbuild --all` confirmed
+  ESLint 10.15.0, minimatch 11.0.5 and the formerly vulnerable nested esbuild at
+  0.25.12; tsx's esbuild remains 0.28.2. `npm run build`, `npm run lint` and
+  `./node_modules/.bin/tsc --noEmit -p tsconfig.test.json` passed. Initial `npm test`
+  hit sandbox EPERM on localhost listeners; rerun with localhost permission passed
+  all 38 unit/HTTP tests. No dependency regression was identified.
+- **Database safety/results:** Read-only Docker inspection confirmed the existing
+  test container at loopback port 5433, tmpfs PostgreSQL 17.10, and live database/role
+  parkingbusiness_test. Ran `TEST_DATABASE_URL=postgresql://parkingbusiness_test:local-test-only@127.0.0.1:5433/parkingbusiness_test DATABASE_URL=postgresql://parkingbusiness:unused@127.0.0.1:5432/parkingbusiness npm run test:integration`;
+  all 89 checks passed with the existing live-identity reset guard. No development
+  database operations were performed. `npm test --prefix simulator` passed 10 tests.
+  `npm run audit:dependencies` returned zero root and simulator findings, without
+  exceptions. Auditing remains time-dependent on registry advisory data.
+- **Tool compatibility:** `npm run dev` against only the test database on port 3199
+  started successfully; GET /occupancy returned 200, 150 entries and no-store.
+  Stopped the watcher cleanly. `./node_modules/.bin/drizzle-kit generate --dialect
+  postgresql --schema ./src/database/schema.ts --out /tmp/bridgefund-audit-generated`
+  generated five tables outside tracked migrations. Direct core-utils synchronous
+  and asynchronous TypeScript transforms passed with the overridden esbuild.
+- **Documentation/review:** Corrected PB-05's historical implementation/test status,
+  fixed pilot-provider identity and parser-before-authentication wording; clarified
+  actual billing/layer responsibilities and README audit policy. Original business
+  decisions and spec-first history remain intact. Codex recommends GO for user
+  review; merge approval and remote/Linux CI results are not claimed. Cross-range
+  overrides remain a compatibility maintenance obligation despite local checks.
+- **Evidence/tools:** Codex used Git, Python, Node/npm, TypeScript/ESLint,
+  Drizzle/core-utils, Docker/PostgreSQL and HTTP checks. Total elapsed time, exact
+  model, token usage and costs were not measured. Nothing committed, merged or pushed.

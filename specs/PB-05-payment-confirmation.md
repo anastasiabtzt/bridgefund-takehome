@@ -1,7 +1,7 @@
 # PB-05: Payment confirmation
 
-Status: approved on 2026-11-12, ready for implementation once this
-specification is committed. Approval does not authorize implementation or a commit.
+Status: approved on 2026-11-12 and committed before implementation.
+Implemented in `07942ad`; see [journal](../JOURNAL.md) for verification and review evidence.
 Sources: [brief](../BRIEF.md), [provider](../docs/payment-provider.md),
 [simulator](../simulator/README.md), [architecture](../docs/architecture.md).
 Use the approved [shared lifecycle](PB-04-check-out.md#shared-lifecycle).
@@ -61,6 +61,10 @@ accepted to preserve provider authentication; no bypass or new integration is ad
 
 ## Ordering, deduplication and atomicity
 
+Transport JSON parsing precedes signature authentication: malformed or oversized
+JSON may receive 400/413 before authentication. For parseable requests, authenticate
+before business validation or effects.
+
 Processing order: authenticate and structurally validate, then start the application
 transaction and acquire a transaction-scoped advisory lock for canonical
 `(provider, paymentId)`. Derive keys deterministically and consistently across
@@ -70,7 +74,7 @@ Replay an accepted matching duplicate or reject conflicting reuse, including a c
 unknown session ID. Only a new event proceeds to session lookup/state checks and
 atomic processing. Retain accepted payment bindings throughout the pilot.
 
-Deduplicate by configured provider identity and payment ID, not session alone.
+Deduplicate by the fixed pilot provider identity (`pilot`) and payment ID, not session alone.
 Bind each accepted ID immutably to canonical session UUID, integer amount, currency
 and status. Exact accepted duplicates return 204 without repeating effects.
 Conflicting reuse returns 409 PAYMENT_ID_REUSED, preserving the original outcome.
@@ -154,6 +158,6 @@ legacy terminals remain unsupported. Backend scope covers settlement and durable
 session completion, but excludes payment-success delivery to exit controllers and
 physical barrier commands. Checkout 200 and webhook 204 are not barrier-open
 commands. How the gate learns payment success remains unresolved; no endpoint or
-callback is assumed and no end-to-end barrier integration is claimed. Commit this
-specification before implementation.
-Tests above are planned, not executed.
+callback is assumed and no end-to-end barrier integration is claimed.
+The acceptance criteria above were specified before implementation; actual executed
+checks and their outcomes are recorded in the [journal](../JOURNAL.md).
